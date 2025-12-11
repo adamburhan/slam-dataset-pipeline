@@ -277,7 +277,9 @@ It outputs:
 ```nginx
 processed_trajectory
 ```
+
 Which gets passed to metrics.
+
 ---
 
 ## Future extension: SLAM internal signals as features
