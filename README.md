@@ -6,8 +6,6 @@ The core idea:
 
 > Given a dataset (e.g., KITTI) and a SLAM system (e.g., ORB-SLAM2), run SLAM on each sequence, preprocess trajectories, compute pose error metrics (RPE, ATE), and export ML-ready labels.
 
-The design is meant to **scale** to multiple datasets and SLAM systems without rewriting the pipeline.
-
 ---
 
 ## Goals
@@ -123,49 +121,6 @@ The full dataset-generation workflow is:
 ```mathematica
 Dataset -> SLAM -> Preprocessing -> Metrics -> ML labels
 ```
----
-
-## Repository Structure
-```markdown
-slam-dataset-pipeline/
-  README.md
-
-  docker/
-    orbslam2/
-      Dockerfile
-      run_slam.sh
-    loam/
-      Dockerfile
-    pipeline/
-      Dockerfile  # Python environment for preprocessing + metrics
-
-  configs/
-    datasets/
-      kitti_odometry.yaml
-      euroc.yaml
-    slam/
-      orb_slam2.yaml
-      loam.yaml
-    preprocessors/
-      constant_velocity.yaml
-    experiments/
-      kitti_orbslam2.yaml
-
-  slam_pipeline/
-    datasets/
-    slam_systems/
-    preprocessors/
-    metrics/
-    io/
-    pipeline/
-
-  scripts/
-    run_slam_cli.py
-    preprocess_cli.py
-    compute_metrics_cli.py
-    run_experiment_cli.py
-```
-
 ---
 
 ## Experiments
