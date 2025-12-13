@@ -10,7 +10,6 @@ class ORBSLAMSystem(SLAMSystem):
         
     def run(self, sequence: Sequence, output_dir):
         try:
-            # Use 'ls -l' on Linux/macOS
             result = subprocess.run(
                 [
                     "docker",
@@ -18,28 +17,25 @@ class ORBSLAMSystem(SLAMSystem):
                     "--rm",
                     "--net=host",
                     "-v",
-                    "/media/adam/T96/ood_slam_data/datasets/KITTI/odometry_gray/sequences:/root/data",
+                    f"{sequence.images_dir}:/data/{sequence.dataset_name}",
+                    "-v",
+                    f"{output_dir}:/output",
                     "-e",
-                    f"DISPLAY={os.environ['DISPLAY']}",
+                    f"DISPLAY={os.environ.get('DISPLAY', '')}",
                     "-e",
                     "QT_X11_NO_MITSHM=1",
                     "-v",
                     "/tmp/.X11-unix:/tmp/.X11-unix",
                     "orbslam2",
-                    "/bin/bash",
-                    "-lc",
-                    (
-                        "cd /dpds/ORB_SLAM2 && "
-                        "./Examples/Monocular/mono_kitti "
-                        "Vocabulary/ORBvoc.txt "
-                        "Examples/Monocular/KITTI00-02.yaml "
-                        "/root/data/00"
-                    ),
+                    "/dpds/ORB_SLAM2/run_slam.sh",
+                    sequence.dataset_name,
+                    sequence.id,
+                    f"/data/{sequence.dataset_name}/output_test/"
                 ], 
-                capture_output=True, text=True, check=True
+                capture_output=True, 
+                text=True, 
+                check=True
             )
-            # Use 'cmd /c dir' on Windows if necessary
-            # result = subprocess.run(["cmd", "/c", "dir"], capture_output=True, text=True, check=True)
 
             print("STDOUT:", result.stdout)
             print("STDERR:", result.stderr)

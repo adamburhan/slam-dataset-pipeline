@@ -32,9 +32,11 @@ RUN apt update && apt install -y nano libglew-dev libgtk2.0-dev pkg-config && \
     make install && \
     
     cd /dpds && \
-    git clone https://github.com/adamburhan/ORB_SLAM2.git 
+    git clone https://github.com/adamburhan/ORB_SLAM2.git
 
+COPY run_slam.sh /dpds/ORB_SLAM2/run_slam.sh
 
 RUN cd /dpds/ORB_SLAM2/ && \
     chmod +x build.sh && \
+    chmod +x run_slam.sh && \
     ./build.sh
