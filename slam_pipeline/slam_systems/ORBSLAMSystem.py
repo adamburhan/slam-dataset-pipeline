@@ -1,6 +1,7 @@
 from .SLAMSystem import SLAMSystem
 from slam_pipeline.datasets.Sequence import Sequence
 
+from pathlib import Path
 import subprocess
 import os
 
@@ -8,7 +9,10 @@ class ORBSLAMSystem(SLAMSystem):
     def __init__(self):
         super().__init__()
         
-    def run(self, sequence: Sequence, output_dir):
+    def run(self, sequence: Sequence, output_dir: Path):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
         try:
             result = subprocess.run(
                 [
@@ -17,7 +21,7 @@ class ORBSLAMSystem(SLAMSystem):
                     "--rm",
                     "--net=host",
                     "-v",
-                    f"{sequence.images_dir}:/data/{sequence.dataset_name}",
+                    f"{sequence.images_dir}:/data/{sequence.dataset_name}/{sequence.id}",
                     "-v",
                     f"{output_dir}:/output",
                     "-e",
@@ -30,16 +34,35 @@ class ORBSLAMSystem(SLAMSystem):
                     "/dpds/ORB_SLAM2/run_slam.sh",
                     sequence.dataset_name,
                     sequence.id,
-                    f"/data/{sequence.dataset_name}/output_test/"
+                    "/output"  # Use container path, not host path
                 ], 
                 capture_output=True, 
                 text=True, 
                 check=True
             )
 
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
-            print("Return code:", result.returncode)
+            # Debug: Check what files were created
+            print(f"Checking output directory: {output_dir}")
+            if output_dir.exists():
+                print(f"Files in output directory: {list(output_dir.iterdir())}")
+            
+            # Print SLAM output for debugging
+            if result.stdout:
+                print("SLAM STDOUT:", result.stdout)
+            if result.stderr:
+                print("SLAM STDERR:", result.stderr)
+
+            # check if output files are created successfully
+            trajectory_file = output_dir / "track_thread_poses.txt"
+            if trajectory_file.exists():
+                print(f"Trajectory file created at: {trajectory_file}")
+                return trajectory_file
+            else:
+                print("Trajectory file was not created.")
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
+                print("Return code:", result.returncode)
+                return None
         except subprocess.CalledProcessError as e:
             print(f"Command failed with return code {e.returncode}")
             print("Error output:", e.stderr)
