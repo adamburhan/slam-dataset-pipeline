@@ -1,5 +1,6 @@
 from slam_pipeline.datasets.Dataset import Dataset
 from slam_pipeline.datasets.Sequence import Sequence
+from slam_pipeline.utils.transformations import line2mat
 from pathlib import Path
 from typing import Optional
 import numpy as np
@@ -21,5 +22,27 @@ class KittiDataset(Dataset):
             ground_truth_file=self.poses_dir / f"{sequence_id}.txt"
         )
         
-    def load_ground_truth(self, sequence: Sequence) -> Optional[np.ndarray]:
-        pass
+    def load_ground_truth(self, sequence: Sequence) -> np.ndarray:
+        """
+        Load KITTI ground truth poses.
+
+        Each line contains 12 values representing a 3x4 pose matrix.
+        Returns an array of shape (N, 4, 4).
+        """
+        gt_file = sequence.ground_truth_file
+        if not gt_file.exists():
+            raise FileNotFoundError(f"Ground truth file not found: {gt_file}")
+
+        poses = []
+        with open(gt_file, "r") as f:
+            for i, line in enumerate(f):
+                values = np.fromstring(line, sep=" ")
+                if values.size != 12:
+                    raise ValueError(
+                        f"Line {i} in {gt_file} has {values.size} values, expected 12"
+                    )
+
+                T = line2mat(values)
+                poses.append(T)
+
+        return np.array(poses)
