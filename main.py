@@ -25,36 +25,41 @@ def main():
 # Example of how to run the main function
 """
 def main():
-    dataset = KittiDataset(Path("/media/adam/T97/ood_slam_data/datasets/KITTI/odometry_gray"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--sequences", nargs="+", default=["04", "01"])
+    parser.add_argument("--force", action="store_true")
+    args = parser.parse_args()
 
-    seqs = ["04", "01"]
+    config = load_config(args.config)
 
-    orb_slam = ORBSLAMSystem(
-        backend="docker",  # later: "singularity"
-        image="orbslam2",
-        data_mount="/media/adam/T97/ood_slam_data/datasets",
-    )
+    dataset = load_dataset_from_config(config.dataset)
+    slam_system = load_slam_system_from_config(config.slam_system)
 
-    rpe_metric = RPEMetric()  # later: configured
+    metric = RPEMetric()  # later from config
 
-    for seq_id in seqs:
+    for seq_id in args.sequences:
         sequence = dataset.get_sequence(seq_id)
 
-        output_dir = Path(f"/home/adam/.../outputs/orb_slam2/kitti_odometry/{seq_id}")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        run_dir = Path(config.outputs_root) / slam_system.name / dataset.name / seq_id
+        run_dir.mkdir(parents=True, exist_ok=True)
 
-        artifacts = orb_slam.run(sequence, output_dir)
-        print(f"Trajectory saved at: {artifacts.trajectory_path}")
+        labels_out = Path(config.labels_root) / slam_system.name / dataset.name / f"{seq_id}.csv"
+        labels_out.parent.mkdir(parents=True, exist_ok=True)
 
-        gt_traj = dataset.load_ground_truth(sequence)          # or sequence.gt_path
-        est_traj = load_trajectory(artifacts.trajectory_path)  # io module
+        if labels_out.exists() and not args.force:
+            print(f"Skipping {seq_id} (labels already exist): {labels_out}")
+            continue
 
-        # optional later:
-        # est_traj = preprocessors.apply(sequence, est_traj)
+        artifacts = slam_system.run(sequence, run_dir)
 
-        labels = rpe_metric.compute(gt_traj, est_traj)
+        gt_traj = dataset.load_ground_truth(sequence)         # returns Trajectory
+        est_traj = load_trajectory(artifacts.trajectory_path) # returns Trajectory
 
-        labels_out = Path(f"/home/adam/.../ml_dataset/labels/orb_slam2/kitti_odometry/{seq_id}.csv")
+        est_traj, gt_traj = associate_trajectories(est_traj, gt_traj, config.association)
+        est_traj, gt_traj = align_trajectories(est_traj, gt_traj, config.alignment)  # can be 'none'
+
+        labels = metric.compute(gt_traj, est_traj)
         write_labels_csv(labels_out, labels)
 """
 
