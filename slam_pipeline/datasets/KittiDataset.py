@@ -1,6 +1,8 @@
 from slam_pipeline.datasets.Dataset import Dataset
 from slam_pipeline.datasets.Sequence import Sequence
 from pathlib import Path
+from typing import Optional
+import numpy as np
 
 class KittiDataset(Dataset):
     def __init__(self, root_dir: Path):
@@ -18,3 +20,6 @@ class KittiDataset(Dataset):
             images_dir=self.sequences_dir / sequence_id,
             ground_truth_file=self.poses_dir / f"{sequence_id}.txt"
         )
+        
+    def load_ground_truth(self, sequence: Sequence) -> Optional[np.ndarray]:
+        pass
