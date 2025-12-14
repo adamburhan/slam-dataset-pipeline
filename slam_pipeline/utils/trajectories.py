@@ -7,6 +7,7 @@ from slam_pipeline.utils.transformations import pos_quat2SE
 class Trajectory:
     stamps: np.ndarray  # shape (N,), timestamps in seconds
     poses: np.ndarray   # shape (N, 4, 4), homogeneous transformation matrices
+    frame_ids: np.ndarray | None = None  # optional, shape (N,), frame IDs
 
     def to_evo(self):
         pass
@@ -33,18 +34,39 @@ def associate_trajectories(est_traj: Trajectory, gt_traj: Trajectory, method: st
 def load_estimated_trajectory(file_path: Path, format: str) -> Trajectory:
     """
     Load estimated trajectory from file.
-    frame_id timestamp tx ty tz qx qy qz qw
+    """
+
+    if format == "tracking_csv_v1":
+        return _load_tracking_csv_v1(file_path)
+    elif format == "tum":
+        return _load_tum(file_path)
+    else:
+        raise ValueError(f"Unknown trajectory format: {format}")
+    
+def _load_tracking_csv_v1(file_path: Path) -> Trajectory:
+    """
+    Expected format per row:
+    frame_id timestamp state tx ty tz qx qy qz qw
     """
     data = np.loadtxt(file_path)
-    stamps = data[:, 1]  # assuming second column is timestamp
+
+    frame_ids = data[:, 0].astype(int)
+    stamps = data[:, 1].astype(np.float64)
+
     poses = []
     for row in data:
-        tx, ty, tz = row[2:5]
-        qx, qy, qz, qw = row[5:9]
-        SE = pos_quat2SE(np.array([tx, ty, tz, qx, qy, qz, qw]))
-        poses.append(SE.reshape(3, 4))
-    poses = np.array(poses)
-    poses_homogeneous = np.zeros((poses.shape[0], 4, 4))
-    poses_homogeneous[:, :3, :] = poses
-    poses_homogeneous[:, 3, 3] = 1.0
-    return Trajectory(stamps=stamps, poses=poses_homogeneous)
+        tx, ty, tz = row[3:6]
+        qx, qy, qz, qw = row[6:10]
+        T = pos_quat2SE(np.array([tx, ty, tz, qx, qy, qz, qw]))
+        poses.append(T)
+
+    poses = np.stack(poses, axis=0)
+
+    return Trajectory(
+        stamps=stamps,
+        poses=poses,
+        frame_ids=frame_ids
+    )
+
+def _load_tum(file_path: Path) -> Trajectory:
+    pass
