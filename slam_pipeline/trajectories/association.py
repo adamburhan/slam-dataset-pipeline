@@ -1,5 +1,5 @@
+from slam_pipeline.trajectories.trajectory import Trajectory
 import numpy as np
-from slam_pipeline.utils.trajectories import Trajectory
 
 def associate_nearest_timestamp(
     est: Trajectory,
@@ -81,4 +81,3 @@ def associate_nearest_timestamp(
         est_new.frame_ids = gt_new.frame_ids.copy()
 
     return est_indices, gt_indices, est_new, gt_new
-

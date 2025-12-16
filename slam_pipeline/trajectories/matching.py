@@ -1,0 +1,122 @@
+from dataclasses import dataclass
+from pathlib import Path
+import numpy as np
+
+from slam_pipeline.datasets.Dataset import Dataset
+from slam_pipeline.trajectories.trajectory import Trajectory, load_estimated_trajectory, TrajFormat
+from slam_pipeline.trajectories.association import associate_nearest_timestamp
+
+@dataclass
+class MatchedPair:
+    """
+    Matched ground truth and estimated trajectories.
+    
+    Structure:
+    - est, gt: Trajectories containing only the M successfully matched frames
+    - matched_frame_ids: Maps each of the M matched poses back to original frame index [0, N)
+    - valid_frame_mask: Dense (N,) boolean array indicating tracking validity for ALL frames
+    
+    Design rationale:
+    - Matched trajectories (M,) enable efficient computation (no NaN handling)
+    - Dense mask (N,) preserves frame alignment for ML dataset generation
+    - Use to_dense_rpe() to convert computed metrics back to dense format
+    
+    Example:
+        Sequence has N=100 frames
+        SLAM matched M=80 frames with GT
+        Of those 80, tracking valid for 75
+        
+        est.poses.shape = (80, 4, 4)  # Only matched
+        matched_frame_ids.shape = (80,)  # e.g. [0, 1, 2, 5, 6, ...]
+        valid_frame_mask.shape = (100,)  # True for 75 of the 80 matched frames
+    """
+    est: Trajectory
+    gt: Trajectory
+    valid_frame_mask: np.ndarray      # (N,) boolean - tracking valid across ALL frames
+    matched_frame_ids: np.ndarray     # (M,) int64 - frame indices for matched poses
+    
+    def __len__(self):
+        """Number of matched frames (M)"""
+        return len(self.est)
+    
+    def num_valid(self) -> int:
+        """Number of frames with valid tracking"""
+        return int(self.valid_frame_mask.sum())
+    
+    def to_dense_array(
+        self, 
+        matched_values: np.ndarray, 
+        num_frames: int,
+        fill_value: float = np.nan
+    ) -> np.ndarray:
+        """
+        Convert matched values (M,) to dense array (N,) aligned with frame indices.
+        
+        Args:
+            matched_values: Values for matched frames, shape (M,) or (M, K)
+            num_frames: Total number of frames in sequence (N)
+            fill_value: Value for unmatched frames (default: NaN)
+            
+        Returns:
+            Dense array of shape (N,) or (N, K)
+        """
+        if len(matched_values) != len(self):
+            raise ValueError(f"matched_values length {len(matched_values)} != matched frames {len(self)}")
+        
+        if matched_values.ndim == 1:
+            dense = np.full(num_frames, fill_value, dtype=matched_values.dtype)
+            dense[self.matched_frame_ids] = matched_values
+        else:
+            # Handle multi-dimensional (e.g., RPE with trans + rot)
+            shape = (num_frames,) + matched_values.shape[1:]
+            dense = np.full(shape, fill_value, dtype=matched_values.dtype)
+            dense[self.matched_frame_ids] = matched_values
+        
+        return dense
+def is_track_valid(states: np.ndarray) -> np.ndarray:
+    # ORB-SLAM2: 0=uninitialized, 4=lost (document once)
+    return (states != 0) & (states != 4)
+
+def prepare_matched_pair(
+    dataset: Dataset,
+    seq_id: str,
+    est_path: Path,
+    est_format: TrajFormat,
+    assoc_cfg,
+) -> MatchedPair:
+    sequence = dataset.get_sequence(seq_id)
+    gt_traj = dataset.load_ground_truth(sequence)
+    est_traj = load_estimated_trajectory(est_path, est_format)
+
+    _, _, est_matched, gt_matched = associate_nearest_timestamp(
+        est_traj,
+        gt_traj,
+        max_diff=assoc_cfg["max_diff"],
+        require_unique=assoc_cfg["require_unique"],
+        assign_gt_frame_ids_to_est=assoc_cfg["assign_gt_frame_ids_to_est"],
+        strict=assoc_cfg["strict"],
+    )
+
+    N = sequence.num_frames()
+
+    if est_matched.frame_ids is None:
+        raise ValueError("est_matched.frame_ids is None; cannot build dense mask.")
+
+    matched_frame_ids = np.asarray(est_matched.frame_ids, dtype=np.int64)
+    if matched_frame_ids.min() < 0 or matched_frame_ids.max() >= N:
+        raise ValueError(f"Matched frame_ids out of range [0, {N-1}]")
+
+    if est_matched.tracking_states is None:
+        valid_mask = np.ones(len(est_matched.stamps), dtype=bool)
+    else:
+        valid_mask = is_track_valid(np.asarray(est_matched.tracking_states, dtype=np.int32))
+
+    valid_frame_mask = np.zeros((N,), dtype=bool)
+    valid_frame_mask[matched_frame_ids] = valid_mask
+
+    return MatchedPair(
+        est=est_matched,
+        gt=gt_matched,
+        valid_frame_mask=valid_frame_mask,
+        matched_frame_ids=matched_frame_ids,
+    )

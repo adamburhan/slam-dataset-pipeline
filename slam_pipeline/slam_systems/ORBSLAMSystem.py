@@ -1,5 +1,6 @@
 from .SLAMSystem import SLAMSystem
 from slam_pipeline.datasets.Sequence import Sequence
+from slam_pipeline.slam_systems.common import SLAMOutput
 
 from pathlib import Path
 import subprocess
@@ -41,22 +42,11 @@ class ORBSLAMSystem(SLAMSystem):
                 check=True
             )
 
-            # Debug: Check what files were created
-            print(f"Checking output directory: {output_dir}")
-            if output_dir.exists():
-                print(f"Files in output directory: {list(output_dir.iterdir())}")
-            
-            # Print SLAM output for debugging
-            if result.stdout:
-                print("SLAM STDOUT:", result.stdout)
-            if result.stderr:
-                print("SLAM STDERR:", result.stderr)
-
             # check if output files are created successfully
             trajectory_file = output_dir / "track_thread_poses.txt"
             if trajectory_file.exists():
                 print(f"Trajectory file created at: {trajectory_file}")
-                return trajectory_file
+                return SLAMOutput(trajectory_path=trajectory_file)
             else:
                 print("Trajectory file was not created.")
                 print("STDOUT:", result.stdout)

@@ -1,7 +1,7 @@
 from slam_pipeline.datasets.Dataset import Dataset
 from slam_pipeline.datasets.Sequence import Sequence
 from slam_pipeline.utils.transformations import line2mat
-from slam_pipeline.utils.trajectories import Trajectory
+from slam_pipeline.trajectories.trajectory import Trajectory
 from pathlib import Path
 from typing import Optional
 import numpy as np
@@ -16,13 +16,15 @@ class KittiDataset(Dataset):
         return [seq_dir.name for seq_dir in self.sequences_dir.iterdir() if seq_dir.is_dir()]
     
     def get_sequence(self, sequence_id: str) -> Sequence:
+        seq_dir = self.sequences_dir / sequence_id
         return Sequence(
             id=sequence_id,
             dataset_name="KITTI",
-            images_dir=self.sequences_dir / sequence_id,
+            sequence_dir=seq_dir,
             ground_truth_file=self.poses_dir / f"{sequence_id}.txt",
-            timestamps_file=self.sequences_dir / sequence_id / "times.txt",
+            timestamps_file=seq_dir / "times.txt",
         )
+
         
     def load_ground_truth(self, sequence: Sequence) -> Trajectory:
         """
