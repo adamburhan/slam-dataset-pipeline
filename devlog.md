@@ -15,3 +15,7 @@
 - evaluate:
   - tracked-only slice
   - failure-adjacent slice
+
+notes:
+- groundtruth loading is implemented in the dataset class
+- estimated trajectory loading is implemented in trajectories and a parameter that is specified is format

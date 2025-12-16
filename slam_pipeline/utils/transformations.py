@@ -256,7 +256,6 @@ def quat2SO(quat_data):
     """
     return R.from_quat(quat_data).as_matrix()
 
-
 def pos_quat2SE(quat_data):
     """Convert position+quaternion to SE(3) matrix.
     
@@ -272,7 +271,6 @@ def pos_quat2SE(quat_data):
     SE[0:3,3] = quat_data[0:3]
     SE = SE[0:3,:].reshape(1,12)
     return SE
-
 
 def pos_quats2SEs(quat_datas):
     """Convert position+quaternion array to KITTI format matrices.
@@ -290,24 +288,21 @@ def pos_quats2SEs(quat_datas):
         SEs[i_data,:] = SE
     return SEs
 
-
-def pos_quats2SE_matrices(quat_datas):
-    """Convert position+quaternion array to 4x4 transformation matrices.
-    
-    Args:
-        quat_datas: (N, 7) array of [x, y, z, qx, qy, qz, qw]
-        
-    Returns:
-        List of N (4, 4) homogeneous transformation matrices
+def pos_quats2SE_matrices(pos_quat_data: np.ndarray) -> np.ndarray:
     """
-    data_len = quat_datas.shape[0]
-    SEs = []
-    for quat in quat_datas:
-        SO = R.from_quat(quat[3:7]).as_matrix()
-        SE = np.eye(4)
-        SE[0:3,0:3] = SO
-        SE[0:3,3]   = quat[0:3]
-        SEs.append(SE)
+    pos_quat_data: (N,7) [x, y, z, qx, qy, qz, qw]
+    returns: (N,4,4)
+    """
+    pos_quat_data = np.atleast_2d(pos_quat_data)
+    N = pos_quat_data.shape[0]
+
+    SEs = np.zeros((N, 4, 4), dtype=np.float64)
+    SEs[:, 3, 3] = 1.0
+
+    # Rotation from quaternions (expects [x, y, z, w] ordering)
+    SEs[:, :3, :3] = R.from_quat(pos_quat_data[:, 3:7]).as_matrix()
+    SEs[:, :3, 3] = pos_quat_data[:, 0:3]
+
     return SEs
 
 def SE2pos_quat(SE_data):

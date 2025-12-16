@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
-from slam_pipeline.utils.transformations import pos_quat2SE
+from slam_pipeline.utils.transformations import pos_quats2SE_matrices
 
 @dataclass
 class Trajectory:
     stamps: np.ndarray  # shape (N,), timestamps in seconds
     poses: np.ndarray   # shape (N, 4, 4), homogeneous transformation matrices
     frame_ids: np.ndarray | None = None  # optional, shape (N,), frame IDs
+    tracking_states: np.ndarray | None = None  # optional, shape (N,), tracking states
 
     def to_evo(self):
         pass
@@ -46,26 +47,21 @@ def load_estimated_trajectory(file_path: Path, format: str) -> Trajectory:
 def _load_tracking_csv_v1(file_path: Path) -> Trajectory:
     """
     Expected format per row:
-    frame_id timestamp state tx ty tz qx qy qz qw
+    frame_id timestamp tracking_state tx ty tz qx qy qz qw
     """
-    data = np.loadtxt(file_path)
+    data = np.atleast_2d(np.loadtxt(file_path))
 
-    frame_ids = data[:, 0].astype(int)
+    frame_ids = data[:, 0].astype(np.int32)
     stamps = data[:, 1].astype(np.float64)
+    tracking_states = data[:, 2].astype(np.int32)
 
-    poses = []
-    for row in data:
-        tx, ty, tz = row[3:6]
-        qx, qy, qz, qw = row[6:10]
-        T = pos_quat2SE(np.array([tx, ty, tz, qx, qy, qz, qw]))
-        poses.append(T)
-
-    poses = np.stack(poses, axis=0)
+    poses = pos_quats2SE_matrices(data[:, 3:10])  # (N,7) -> (N,4,4)
 
     return Trajectory(
         stamps=stamps,
         poses=poses,
-        frame_ids=frame_ids
+        frame_ids=frame_ids,
+        tracking_states=tracking_states
     )
 
 def _load_tum(file_path: Path) -> Trajectory:
