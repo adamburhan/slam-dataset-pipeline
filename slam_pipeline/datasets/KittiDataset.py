@@ -25,7 +25,6 @@ class KittiDataset(Dataset):
             timestamps_file=seq_dir / "times.txt",
         )
 
-        
     def load_ground_truth(self, sequence: Sequence) -> Trajectory:
         """
         Load KITTI ground truth poses.

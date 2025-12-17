@@ -34,7 +34,9 @@ def main():
             "strict": True,
         },
     )
-    
+    print(len(matched_trajectories))
+    print(matched_trajectories.matched_frame_ids)
+    print(matched_trajectories.valid_frame_mask)
 # Example of how to run the main function
 """
 def main():
