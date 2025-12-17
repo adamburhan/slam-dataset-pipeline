@@ -73,6 +73,7 @@ class MatchedPair:
             dense[self.matched_frame_ids] = matched_values
         
         return dense
+    
 def is_track_valid(states: np.ndarray) -> np.ndarray:
     # ORB-SLAM2: 0=uninitialized, 4=lost (document once)
     return (states != 0) & (states != 4)
