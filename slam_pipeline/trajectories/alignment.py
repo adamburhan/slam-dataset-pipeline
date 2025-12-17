@@ -47,11 +47,15 @@ def transform(
         right_mul: whether to apply it right-multiplicative or not
         propagate: whether to propagate drift with RHS transformations
     """
-    transformed_poses = traj.poses.copy()
-    if right_mul and not propagate:
-        transformed_poses = transformed_poses @ T
-    elif right_mul and propagate:
-        pass
+    # transformed_poses = traj.poses.copy()
+    # if right_mul and not propagate:
+    #     transformed_poses = transformed_poses @ T
+    # elif right_mul and propagate:
+    #     ids = np.arange(0, traj.poses.shape[0], 1, dtype=int)
+    #     rel_poses = [
+
+    #     ]
+    pass
 
 def align(
     est_traj: Trajectory, 
