@@ -1,9 +1,14 @@
 """
-Credit: Michael Grupp github.com/MichaelGrupp/evo
+Trajectory alignment using Umeyama's method (Sim3).
+
+Credit: Core alignment algorithm from Michael Grupp's evo package
+https://github.com/MichaelGrupp/evo
+Licensed under BSD 3-Clause License.
 """
 
 import numpy as np
 from slam_pipeline.trajectories.trajectory import Trajectory
+import slam_pipeline.utils.lie_algebra as lie
 
 UmeyamaResult = tuple[np.ndarray, np.ndarray, float]
 
@@ -40,41 +45,59 @@ def transform(
     propagate: bool = False
 ) -> Trajectory:
     """
-    apply a left or right multiplicative transformation to the whole trajectory
+    Apply a left or right multiplicative transformation to the whole trajectory.
+    
     Args:
         traj: Trajectory to be transformed
-        T: a 4x4 transformation matrix (e.g. SE(3) or Sim(3))
-        right_mul: whether to apply it right-multiplicative or not
-        propagate: whether to propagate drift with RHS transformations
+        T: 4x4 transformation matrix (e.g. SE(3) or Sim(3))
+        right_mul: Whether to apply right-multiplicative
+        propagate: Whether to propagate drift with RHS transformations
+    
+    Returns:
+        Transformed Trajectory
     """
-    # transformed_poses = traj.poses.copy()
-    # if right_mul and not propagate:
-    #     transformed_poses = transformed_poses @ T
-    # elif right_mul and propagate:
-    #     ids = np.arange(0, traj.poses.shape[0], 1, dtype=int)
-    #     rel_poses = [
-
-    #     ]
-    pass
+    transformed_poses = traj.poses.copy()
+    
+    if right_mul and not propagate:
+        transformed_poses = transformed_poses @ T
+    elif right_mul and propagate:
+        ids = np.arange(0, traj.poses.shape[0], 1, dtype=int)
+        rel_poses = [
+            lie.relative_se3(traj.poses[i], traj.poses[i + 1]) @ T for i in ids[:-1]
+        ]
+        transformed_poses[0] = transformed_poses[0] 
+        for i in ids[1:]:
+            transformed_poses[i] = transformed_poses[i-1] @ rel_poses[i-1]
+    else:
+        transformed_poses = T @ transformed_poses
+    
+    return Trajectory(
+        stamps=traj.stamps,
+        poses=transformed_poses,
+        frame_ids=traj.frame_ids,
+        tracking_states=traj.tracking_states
+    )
 
 def align(
     est_traj: Trajectory, 
     gt_traj: Trajectory, 
     with_scale: bool = False,
     only_scale: bool = False
-) -> tuple[Trajectory, UmeyamaResult]:
+) -> tuple[Trajectory, np.ndarray, np.ndarray, float]:
     """
     Aligns the estimated trajectory to the ground truth trajectory using Umeyama's method.
     
     Args:
         est_traj: Estimated trajectory
         gt_traj: Ground truth trajectory
-        with_scale: Whether to estimate scale factor
+        with_scale: Whether to estimate scale factor (True for monocular SLAM)
+        only_scale: Whether to apply only scale (not rotation/translation)
     
     Returns:
+        aligned_est: Aligned estimated trajectory
         r: Rotation matrix (3x3)
         t: Translation vector (3,)
-        c: Scale factor (float)
+        c: Scale factor
     """
     if len(est_traj) != len(gt_traj):
         raise GeometryException("Trajectories must have the same number of poses for alignment.")
@@ -88,8 +111,14 @@ def align(
         scaled_est_traj = scale(est_traj, c)
         return scaled_est_traj, r, t, c
     elif with_scale:
+        # Apply scale first, then SE(3) transformation
         scaled_est_traj = scale(est_traj, c)
-    return r, t, c
+        aligned_est = transform(scaled_est_traj, lie.se3(r, t))
+        return aligned_est, r, t, c
+    else:
+        # Only apply SE(3) transformation (no scale)
+        aligned_est = transform(est_traj, lie.se3(r, t))
+        return aligned_est, r, t, c
 
 def umeyama_alignment(
     x: np.ndarray, y: np.ndarray, with_scale: bool = False
@@ -97,12 +126,19 @@ def umeyama_alignment(
     """
     Computes the least squares solution parameters of an Sim(m) matrix
     that minimizes the distance between a set of registered points.
+    
     Umeyama, Shinji: Least-squares estimation of transformation parameters
                      between two point patterns. IEEE PAMI, 1991
-    :param x: mxn matrix of points, m = dimension, n = nr. of data points
-    :param y: mxn matrix of points, m = dimension, n = nr. of data points
-    :param with_scale: set to True to align also the scale (default: 1.0 scale)
-    :return: r, t, c - rotation matrix, translation vector and scale factor
+    
+    Args:
+        x: mxn matrix of points, m = dimension, n = nr. of data points
+        y: mxn matrix of points, m = dimension, n = nr. of data points
+        with_scale: set to True to align also the scale (default: 1.0 scale)
+    
+    Returns:
+        r: Rotation matrix (3x3)
+        t: Translation vector (3,)
+        c: Scale factor
     """
     if x.shape != y.shape:
         raise GeometryException("data matrices must have the same shape")
