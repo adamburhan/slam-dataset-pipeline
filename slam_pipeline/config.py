@@ -18,7 +18,7 @@ class SystemConfig:
 
 @dataclass
 class AssociationConfig:
-    max_time_diff: float = 0.02
+    max_diff: float = 0.02
     require_unique: bool = True
     assign_gt_frame_ids_to_est: bool = True
     strict: bool = True

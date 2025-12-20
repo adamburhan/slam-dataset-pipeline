@@ -11,7 +11,7 @@ class ORBSLAMSystem(SLAMSystem):
         super().__init__()
         
     def run(self, sequence: Sequence, output_dir: Path):
-        output_dir = Path(output_dir)
+        output_dir = Path(output_dir).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
         
         try:
@@ -22,7 +22,7 @@ class ORBSLAMSystem(SLAMSystem):
                     "--rm",
                     "--net=host",
                     "-v",
-                    f"{sequence.images_dir}:/data/{sequence.dataset_name}/{sequence.id}",
+                    f"{sequence.sequence_dir.resolve()}:/data/{sequence.dataset_name}/{sequence.id}",
                     "-v",
                     f"{output_dir}:/output",
                     "-e",

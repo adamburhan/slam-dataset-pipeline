@@ -5,6 +5,7 @@ from slam_pipeline.slam_systems.factory import get_system
 from slam_pipeline.trajectories.matching import prepare_matched_pair
 from slam_pipeline.trajectories.alignment import align
 from slam_pipeline.metrics.rpe import compute_rpe
+from slam_pipeline.trajectories.trajectory import TrajFormat
 
 class Pipeline:
     def __init__(self, cfg):
@@ -28,13 +29,14 @@ class Pipeline:
 
         # 3. Match & Fill
         loading_cfg = self.cfg.pipeline.loading
+        est_format = TrajFormat.TRACKING_CSV_V1 if loading_cfg.est_format == "tracking_csv_v1" else TrajFormat.TUM
         matched = prepare_matched_pair(
             dataset=dataset,
             seq_id=sequence_id,
             est_path=slam_output.trajectory_path,
-            est_format=loading_cfg.est_format,
+            est_format=est_format,
             assoc_cfg={
-                "max_time_diff": loading_cfg.association.max_time_diff,
+                "max_diff": loading_cfg.association.max_diff,
                 "interpolate_gt": loading_cfg.association.interpolate_gt,
                 "require_unique": loading_cfg.association.require_unique,
                 "assign_gt_frame_ids_to_est": loading_cfg.association.assign_gt_frame_ids_to_est,
@@ -78,9 +80,9 @@ class Pipeline:
             "validity_mask": ~np.isnan(dense_rpe_trans)
         }
         
-        # 8. Save Results
-        if self.cfg.pipeline.output.save_npz:
-            self.save_results(results, output_dir)
+        # # 8. Save Results
+        # if self.cfg.pipeline.output.save_npz:
+        #     self.save_results(results, output_dir)
             
         return results
 

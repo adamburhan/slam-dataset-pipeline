@@ -16,4 +16,4 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["slam_dataset_pipeline"]
+packages = ["slam_pipeline"]

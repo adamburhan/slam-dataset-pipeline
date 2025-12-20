@@ -1,7 +1,7 @@
 # 1. Dataset Configuration
 dataset:
   name: "kitti"  # kitti, tum, euroc
-  root_dir: "/path/to/dataset"
+  root_dir: "/media/adam/T97/ood_slam_data/datasets/KITTI/odometry_gray"
   # sequences: ["04", "01"] # Optional: can be overridden by CLI for Slurm
 
 # 2. System / Runtime Configuration
@@ -16,9 +16,9 @@ system:
 pipeline:
   # A. Trajectory Loading & Matching
   loading:
-    est_format: "tum" # or kitti, euroc
+    est_format: "tracking_csv_v1" # or kitti, euroc
     association:
-      max_time_diff: 0.02
+      max_diff: 0.02
       require_unique: true
       assign_gt_frame_ids_to_est: true
       strict: true
@@ -41,4 +41,4 @@ pipeline:
     save_trajectory: true
     save_plots: true
     save_npz: true # The ML dataset format
-    output_dir: "results/experiment_name"
+    output_dir: "results"
