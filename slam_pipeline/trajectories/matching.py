@@ -3,8 +3,9 @@ from pathlib import Path
 import numpy as np
 
 from slam_pipeline.datasets.Dataset import Dataset
-from slam_pipeline.trajectories.trajectory import Trajectory, load_estimated_trajectory, TrajFormat
+from slam_pipeline.trajectories.trajectory import Trajectory, load_estimated_trajectory, TrajFormat, fill_and_correct_trajectory
 from slam_pipeline.trajectories.association import associate_nearest_timestamp
+from slam_pipeline.trajectories.tracking_states import is_track_valid
 
 @dataclass
 class MatchedPair:
@@ -43,40 +44,29 @@ class MatchedPair:
         """Number of frames with valid tracking"""
         return int(self.valid_frame_mask.sum())
     
-    def to_dense_array(
-        self, 
-        matched_values: np.ndarray, 
+    def to_dense_rpe(
+        self,
+        rpe_values: np.ndarray,  # (M-1,)
         num_frames: int,
         fill_value: float = np.nan
     ) -> np.ndarray:
-        """
-        Convert matched values (M,) to dense array (N,) aligned with frame indices.
+        """Convert RPE (M-1,) to dense (N-1,) array."""
+        dense = np.full(num_frames - 1, fill_value)
         
-        Args:
-            matched_values: Values for matched frames, shape (M,) or (M, K)
-            num_frames: Total number of frames in sequence (N)
-            fill_value: Value for unmatched frames (default: NaN)
-            
-        Returns:
-            Dense array of shape (N,) or (N, K)
-        """
-        if len(matched_values) != len(self):
-            raise ValueError(f"matched_values length {len(matched_values)} != matched frames {len(self)}")
-        
-        if matched_values.ndim == 1:
-            dense = np.full(num_frames, fill_value, dtype=matched_values.dtype)
-            dense[self.matched_frame_ids] = matched_values
-        else:
-            # Handle multi-dimensional (e.g., RPE with trans + rot)
-            shape = (num_frames,) + matched_values.shape[1:]
-            dense = np.full(shape, fill_value, dtype=matched_values.dtype)
-            dense[self.matched_frame_ids] = matched_values
+        for i in range(len(rpe_values)):
+            frame_idx = self.matched_frame_ids[i]
+            # RPE[i] is error between frame_idx and frame_idx+1
+            if frame_idx < num_frames - 1:
+                dense[frame_idx] = rpe_values[i]
         
         return dense
     
-def is_track_valid(states: np.ndarray) -> np.ndarray:
-    # ORB-SLAM2: 0=uninitialized, 4=lost (document once)
-    return (states != 0) & (states != 4)
+    def get_rpe_valid_mask(self) -> np.ndarray:
+        """
+        RPE[i] is valid iff frame i AND frame i+1 both have valid tracking.
+        Returns (N-1,) boolean array.
+        """
+        return self.valid_frame_mask[:-1] & self.valid_frame_mask[1:]
 
 def prepare_matched_pair(
     dataset: Dataset,
@@ -84,11 +74,19 @@ def prepare_matched_pair(
     est_path: Path,
     est_format: TrajFormat,
     assoc_cfg,
+    fill_policy: str = "none" # none or "constant_velocity"
 ) -> MatchedPair:
     sequence = dataset.get_sequence(seq_id)
     gt_traj = dataset.load_ground_truth(sequence)
     est_traj = load_estimated_trajectory(est_path, est_format)
+    
+    # Fill and correct BEFORE association
+    if fill_policy == "constant_velocity":
+        est_traj = fill_and_correct_trajectory(est_traj)
 
+    if assoc_cfg["interpolate_gt"] == True:
+        raise NotImplementedError("GT interpolation not implemented yet.")
+    
     _, _, est_matched, gt_matched = associate_nearest_timestamp(
         est_traj,
         gt_traj,

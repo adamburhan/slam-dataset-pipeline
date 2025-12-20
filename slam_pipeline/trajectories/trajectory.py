@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
 from slam_pipeline.utils.transformations import pos_quats2SE_matrices
+from slam_pipeline.trajectories.tracking_states import is_track_valid
 from enum import Enum
 
 class TrajFormat(Enum):
@@ -63,7 +64,7 @@ def _load_tracking_csv_v1(file_path: Path) -> Trajectory:
     Expected format per row:
     frame_id timestamp tracking_state tx ty tz qx qy qz qw
     """
-    data = np.atleast_2d(np.loadtxt(file_path))
+    data = np.atleast_2d(np.loadtxt(file_path, usecols=range(10)))
 
     frame_ids = data[:, 0].astype(np.int32)
     stamps = data[:, 1].astype(np.float64)
@@ -80,3 +81,74 @@ def _load_tracking_csv_v1(file_path: Path) -> Trajectory:
 
 def _load_tum(file_path: Path) -> Trajectory:
     pass
+
+def fill_and_correct_trajectory(traj: Trajectory) -> Trajectory:
+    """
+    1. Fill gaps with constant velocity model
+    2. Correct reinitialized segments to match predicted pose 
+    """
+    if traj.tracking_states is None:
+        return traj
+    
+    valid = is_track_valid(traj.tracking_states)
+    
+    if valid.all():
+        return traj
+    
+    poses = traj.poses.copy()
+    states = traj.tracking_states.copy()
+    valid_indices = np.where(valid)[0]
+    
+    if len(valid_indices) < 2:
+        raise ValueError("Not enough valid poses to fill trajectory.")
+    
+    # Process frame by frame
+    i = 0
+    while i < len(poses):
+        if valid[i]:
+            i += 1
+            continue
+        
+        # Found start of gap
+        gap_start = i 
+        while i < len(poses) and not valid[i]:
+            i += 1
+        gap_end = i # First valid frame after gap (or len if none)
+        
+        # Get the last 2 valid poses before gap for velocity
+        prev_valid = valid_indices[valid_indices < gap_start]
+        if len(prev_valid) < 2:
+            # can't estimate velocity, hold last
+            for j in range(gap_start, min(gap_end, len(poses))):
+                poses[j] = poses[prev_valid[-1]]
+                states[j] = 5 # filled state
+            continue
+        
+        i1, i2 = prev_valid[-2], prev_valid[-1]
+        delta = np.linalg.inv(poses[i1]) @ poses[i2]
+        
+        # Fill gap with constant velocity
+        T_pred = poses[i2].copy()
+        for j in range(i2 + 1, gap_end):
+            T_pred = T_pred @ delta
+            poses[j] = T_pred.copy()
+            states[j] = 5 
+            
+        # Correct subsequent segment if exists
+        if gap_end < len(poses):
+            # T_pred is now prediction for frame gap_end
+            # poses[gap_end] is the reinitialized pose (different frame)
+            T_reinit = poses[gap_end].copy()
+            T_corr = T_pred @ np.linalg.inv(T_reinit)
+            
+            # Apply correction to all subsequent poses
+            for j in range(gap_end, len(poses)):
+                poses[j] = T_corr @ poses[j]
+    
+    return Trajectory(
+        stamps=traj.stamps,
+        poses=poses,
+        frame_ids=traj.frame_ids,
+        tracking_states=states
+    )
+        

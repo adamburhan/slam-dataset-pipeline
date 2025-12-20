@@ -1,0 +1,44 @@
+# 1. Dataset Configuration
+dataset:
+  name: "kitti"  # kitti, tum, euroc
+  root_dir: "/path/to/dataset"
+  # sequences: ["04", "01"] # Optional: can be overridden by CLI for Slurm
+
+# 2. System / Runtime Configuration
+system:
+  name: "orbslam2"
+  docker_image: "orbslam2:latest" # Crucial for reproducibility
+  # Optional: runtime specific args
+  runtime_args:
+    network: "host"
+
+# 3. Processing Pipeline Configuration
+pipeline:
+  # A. Trajectory Loading & Matching
+  loading:
+    est_format: "tum" # or kitti, euroc
+    association:
+      max_time_diff: 0.02
+      require_unique: true
+      assign_gt_frame_ids_to_est: true
+      strict: true
+      interpolate_gt: false
+    fill_policy: "constant_velocity" # mask, impute_last, constant_velocity
+
+  # B. Alignment (Sim3 vs SE3)
+  alignment:
+    method: "sim3" # sim3 (with scale), se3 (rigid), or none
+    align_ground_truth: false # usually we align est to gt
+
+  # C. Metrics to Compute
+  metrics:
+    - name: "rpe"
+      params: { unit: "meters" }
+    - name: "ate"
+    
+  # D. Output / Artifacts
+  output:
+    save_trajectory: true
+    save_plots: true
+    save_npz: true # The ML dataset format
+    output_dir: "results/experiment_name"

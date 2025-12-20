@@ -9,7 +9,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "matplotlib>=3.10.8",
     "numpy>=2.3.5",
+    "pyyaml>=6.0.3",
     "scipy>=1.16.3",
 ]
 
