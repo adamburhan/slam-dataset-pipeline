@@ -7,6 +7,7 @@ from slam_pipeline.trajectories.alignment import align
 from slam_pipeline.metrics.rpe import compute_rpe
 from slam_pipeline.trajectories.trajectory import TrajFormat
 
+
 class Pipeline:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -46,7 +47,16 @@ class Pipeline:
         )
         
         valid_ratio = matched.num_valid() / N
+        
+        # Check for filled frames
+        num_filled = 0
+        if matched.est.tracking_states is not None:
+            # Assuming TRACKING_FILLED = 5
+            num_filled = (matched.est.tracking_states == 5).sum()
+            
         print(f"\nSeq {sequence_id}: {N} frames, {matched.num_valid()}/{N} valid ({valid_ratio:.2%})")
+        if num_filled > 0:
+            print(f"  Filled frames: {num_filled} ({(num_filled/N):.2%})")
         
         # 4. Align (Parameterized)
         align_cfg = self.cfg.pipeline.alignment
@@ -74,17 +84,39 @@ class Pipeline:
             "scale_factor": scale,
             "rpe_trans_mean": np.nanmean(dense_rpe_trans),
             "rpe_trans_max": np.nanmax(dense_rpe_trans),
-            "trajectory_path": str(slam_output.trajectory_path),
+            #"trajectory_path": str(slam_output.trajectory_path),
             "dense_rpe_trans": dense_rpe_trans,
             "dense_rpe_rot": dense_rpe_rot,
             "validity_mask": ~np.isnan(dense_rpe_trans)
         }
         
-        # # 8. Save Results
-        # if self.cfg.pipeline.output.save_npz:
-        #     self.save_results(results, output_dir)
+        # 8. Save Results
+        if self.cfg.pipeline.output.save_npz:
+            self.save_results(results, output_dir)
+        
+        # 9. Plot Results
+        if self.cfg.pipeline.output.save_plots:
+            self.plot_results(results, matched, output_dir)
             
         return results
+
+    def plot_results(self, results, matched, output_dir):
+        from slam_pipeline.utils.plotting import plot_rpe, plot_trajectory
+        
+        # Plot RPE
+        plot_rpe(
+            results["dense_rpe_trans"], 
+            results["dense_rpe_rot"], 
+            output_dir
+        )
+        
+        # Plot Trajectory
+        plot_trajectory(
+            matched.est.poses, 
+            matched.gt.poses, 
+            output_dir / "trajectory_plot.png"
+        )
+        print(f"Saved plots to {output_dir}")
 
     def save_results(self, results, output_dir: Path):
         """Saves the dense results to an .npz file for ML training."""

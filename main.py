@@ -15,15 +15,15 @@ def plot_trajectories(traj1, traj2):
     fig, ax = plt.subplots(figsize=(12, 12))  # Square figure for equal aspect
     
     # Plot trajectories
-    ax.plot(traj1.poses[:, 0, 3], traj1.poses[:, 2, 3], 
+    ax.plot(traj1.poses[:, 0, 3], traj1.poses[:, 1, 3], 
             'b-', linewidth=2, label="Estimated", alpha=0.7)
-    ax.plot(traj2.poses[:, 0, 3], traj2.poses[:, 2, 3], 
+    ax.plot(traj2.poses[:, 0, 3], traj2.poses[:, 1, 3], 
             'r--', linewidth=2, label="Ground Truth", alpha=0.7)
     
     # Mark start and end points
-    ax.plot(traj1.poses[0, 0, 3], traj1.poses[0, 2, 3], 
+    ax.plot(traj1.poses[0, 0, 3], traj1.poses[0, 1, 3], 
             'go', markersize=10, label='Start', zorder=5)
-    ax.plot(traj1.poses[-1, 0, 3], traj1.poses[-1, 2, 3], 
+    ax.plot(traj1.poses[-1, 0, 3], traj1.poses[-1, 1, 3], 
             'rs', markersize=10, label='End', zorder=5)
     
     # CRITICAL: Equal aspect ratio so 1m horizontal = 1m vertical on screen

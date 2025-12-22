@@ -90,61 +90,94 @@ def fill_and_correct_trajectory(traj: Trajectory) -> Trajectory:
     if traj.tracking_states is None:
         return traj
     
-    valid = is_track_valid(traj.tracking_states)
+    poses = traj.poses.copy()
+    states = traj.tracking_states.copy()
     
+    # We need to update validity dynamically as we fill
+    valid = is_track_valid(states)
     if valid.all():
         return traj
     
-    poses = traj.poses.copy()
-    states = traj.tracking_states.copy()
-    valid_indices = np.where(valid)[0]
-    
-    if len(valid_indices) < 2:
-        raise ValueError("Not enough valid poses to fill trajectory.")
-    
-    # Process frame by frame
+    N = len(poses)
     i = 0
-    while i < len(poses):
+    
+    while i < N:
         if valid[i]:
             i += 1
             continue
-        
-        # Found start of gap
-        gap_start = i 
-        while i < len(poses) and not valid[i]:
+            
+        # Found start of gap at index 'i'
+        gap_start = i
+        while i < N and not valid[i]:
             i += 1
-        gap_end = i # First valid frame after gap (or len if none)
+        gap_end = i # First valid frame after gap (or N)
         
-        # Get the last 2 valid poses before gap for velocity
-        prev_valid = valid_indices[valid_indices < gap_start]
-        if len(prev_valid) < 2:
-            # can't estimate velocity, hold last
-            for j in range(gap_start, min(gap_end, len(poses))):
-                poses[j] = poses[prev_valid[-1]]
-                states[j] = 5 # filled state
+        # --- STRATEGY SELECTION ---
+        
+        # Case A: Gap is at the very beginning
+        if gap_start == 0:
+            if gap_end == N:
+                # Whole trajectory is invalid
+                return traj 
+            
+            # Backfill with the first valid pose (constant position backwards)
+            # We cannot estimate velocity without history.
+            first_valid_pose = poses[gap_end]
+            for j in range(gap_start, gap_end):
+                poses[j] = first_valid_pose.copy()
+                states[j] = 5 # Filled
+                valid[j] = True # Mark as valid for future lookups
+            
+            # No correction needed for the future because we aligned to it
             continue
+
+        # Case B: We have history
+        # Use the immediately preceding frames (whether original or filled)
+        # to estimate velocity.
+        i1, i2 = gap_start - 2, gap_start - 1
         
-        i1, i2 = prev_valid[-2], prev_valid[-1]
-        delta = np.linalg.inv(poses[i1]) @ poses[i2]
-        
-        # Fill gap with constant velocity
-        T_pred = poses[i2].copy()
-        for j in range(i2 + 1, gap_end):
+        if i1 < 0:
+            # Only 1 frame of history (gap starts at index 1)
+            # Assume zero velocity (constant position)
+            delta = np.eye(4)
+        else:
+            # Calculate relative motion: T_{k-1} -> T_k
+            # delta = T_{k-1}^{-1} @ T_k
+            delta = np.linalg.inv(poses[i1]) @ poses[i2]
+
+        # --- FILLING ---
+        T_pred = poses[gap_start - 1].copy()
+        for j in range(gap_start, gap_end):
             T_pred = T_pred @ delta
             poses[j] = T_pred.copy()
-            states[j] = 5 
-            
-        # Correct subsequent segment if exists
-        if gap_end < len(poses):
-            # T_pred is now prediction for frame gap_end
-            # poses[gap_end] is the reinitialized pose (different frame)
+            states[j] = 5
+            valid[j] = True
+
+        # --- CORRECTION ---
+        # If there is a valid segment after this gap, it might be re-initialized.
+        # We align it to our prediction.
+        if gap_end < N:
             T_reinit = poses[gap_end].copy()
-            T_corr = T_pred @ np.linalg.inv(T_reinit)
             
-            # Apply correction to all subsequent poses
-            for j in range(gap_end, len(poses)):
-                poses[j] = T_corr @ poses[j]
-    
+            # Our prediction for gap_end (one step after the filled gap)
+            T_pred_at_gap_end = T_pred @ delta
+            
+            # Correction matrix: T_corr @ T_reinit = T_pred
+            T_corr = T_pred_at_gap_end @ np.linalg.inv(T_reinit)
+            
+            # Apply correction to the contiguous valid segment
+            # We stop at the next gap (or end)
+            k = gap_end
+            while k < N and is_track_valid(np.array([states[k]]))[0]: # Check original state validity
+                # Note: We check original state to stop at next gap. 
+                # But 'valid' array is being updated. 
+                # Actually, we can just check 'valid[k]' because we haven't filled future gaps yet.
+                if not valid[k]: 
+                    break
+                
+                poses[k] = T_corr @ poses[k]
+                k += 1
+                
     return Trajectory(
         stamps=traj.stamps,
         poses=poses,

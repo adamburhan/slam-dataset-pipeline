@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Dict, Any
 from .Dataset import Dataset
-from .KittiDataset import KittiDataset
+from slam_pipeline.datasets.KittiDataset import KittiDataset
+from slam_pipeline.datasets.TartanAirDataset import TartanAirDataset
 # from .TartanAirDataset import TartanAirDataset # Example
 
 def get_dataset(config: Any) -> Dataset:
@@ -23,7 +24,7 @@ def get_dataset(config: Any) -> Dataset:
     
     if name == "kitti":
         return KittiDataset(root_path)
-    # elif name == "tartanair":
-    #     return TartanAirDataset(root_path)
+    elif name == "tartanair":
+        return TartanAirDataset(root_path)
     else:
         raise ValueError(f"Unknown dataset: {name}")

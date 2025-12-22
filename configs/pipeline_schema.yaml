@@ -1,7 +1,7 @@
 # 1. Dataset Configuration
 dataset:
-  name: "kitti"  # kitti, tum, euroc
-  root_dir: "/media/adam/T97/ood_slam_data/datasets/KITTI/odometry_gray"
+  name: "tartanair"  # kitti, tum, euroc
+  root_dir: "/media/adam/external_hd/tartanair/abandonedfactory_Easy_image_left/abandonedfactory/"
   # sequences: ["04", "01"] # Optional: can be overridden by CLI for Slurm
 
 # 2. System / Runtime Configuration
