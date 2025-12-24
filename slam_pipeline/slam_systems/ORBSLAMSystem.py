@@ -19,22 +19,29 @@ class ORBSLAMSystem(SLAMSystem):
         # Define volumes
         volumes = {
             sequence.sequence_dir: f"/data/{sequence.dataset_name}/{sequence.id}",
-            output_dir: "/output",
-            Path("/tmp/.X11-unix"): "/tmp/.X11-unix" # For display
+            output_dir: "/output"
         }
         
+        if self.config.display:
+            volumes[Path("/tmp/.X11-unix")] = "/tmp/.X11-unix"  # For display
+            
+        if self.config.mount_slam:
+            volumes[Path("/home/adam/Documents/MILA/projects/ORB_SLAM2")] = "/dpds/ORB_SLAM2"  # Mount local ORB_SLAM2 code
+        
         # Define environment
-        env = {
-            "DISPLAY": os.environ.get('DISPLAY', ''),
-            "QT_X11_NO_MITSHM": "1"
-        }
+        if self.config.display:
+            env = {
+                "DISPLAY": os.environ.get('DISPLAY', ''),
+                "QT_X11_NO_MITSHM": "1"
+            }
         
         # Define command
         command = [
             "/dpds/ORB_SLAM2/run_slam.sh",
             sequence.dataset_name,
             sequence.id,
-            "/output"
+            "/output",
+            "1" if self.config.display else "0"
         ]
         
         image = self.config.docker_image

@@ -12,7 +12,8 @@ def is_track_valid(states: np.ndarray, include_filled: bool = False) -> np.ndarr
     
     ORB-SLAM2: 0=uninitialized, 2=OK, 4=lost, 5=filled (custom)
     """
-    valid = (states != TRACKING_UNINITIALIZED) & (states != TRACKING_LOST)
+    #valid = (states != TRACKING_UNINITIALIZED) & (states != TRACKING_LOST)
+    valid = (states == TRACKING_OK)
     if include_filled:
         valid |= (states == TRACKING_FILLED)
     return valid

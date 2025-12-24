@@ -9,27 +9,84 @@ from slam_pipeline.utils.transformations import pos_quats2SE_matrices
 from pathlib import Path
 from typing import Optional
 import numpy as np
+from dataclasses import dataclass
+
+@dataclass
+class TartanAirSequence(Sequence):
+    """Extended sequence with TartanAir-specific metadata."""
+    domain: str = "" # e.g, "abandonedfactory"
+    difficulty: str = "" # e.g, "Easy" or "Hard"
+
 
 class TartanAirDataset(Dataset):
-    def __init__(self, root_dir: Path):
+    """
+    TartanAir dataset structure:
+    root_dir/
+    |--- abandonedfactory/
+    |    |--- Easy/
+    |    |    |--- P000/
+    |    |    |--- P001/
+    |    |    |___ ...
+    |    |___ Hard/
+    |         |--- P000/
+    |         |___ ...
+    |--- hospital/
+    |    |--- Easy/
+    |    |___ Hard/
+    |___ ...
+    """
+    def __init__(self, root_dir: Path, domains: Optional[list[str]] = None, difficulties: Optional[list[str]] = None):
         self.root_dir = root_dir
-        self.sequences_dir = root_dir / "Easy"
-        self.poses_dir = root_dir / "Easy" / "P000"
+        self.domains = domains # Filter to specific domains, None = all
+        self.difficulties = difficulties or ["Easy", "Hard"]
         
-    def list_sequences(self):
-        return [seq_dir.name for seq_dir in self.sequences_dir.iterdir() if seq_dir.is_dir()]
+    def _discover_sequences(self) -> list[tuple[str, str, str]]:
+        """Discover all (domain, difficulty, seq_id) tuples."""
+        sequences = []
+        
+        for domain_dir in self.root_dir.iterdir():
+            if not domain_dir.is_dir():
+                continue
+            if self.domains is not None and domain_dir.name not in self.domains:
+                continue
+            for difficulty in self.difficulties:
+                diff_dir = domain_dir / difficulty
+                if not diff_dir.exists():
+                    continue
+                
+                for seq_dir in diff_dir.iterdir():
+                    if seq_dir.is_dir():
+                        sequences.append((domain_dir.name, difficulty, seq_dir.name))
+        return sequences
     
-    def get_sequence(self, sequence_id: str) -> Sequence:
-        seq_dir = self.sequences_dir / sequence_id
-        return Sequence(
+    def list_sequences(self):
+        """Return flat list of sequence IDs in format 'domain/difficulty/seq_id'."""
+        return [f"{d}/{diff}/{seq_id}" for d, diff, seq_id in self._discover_sequences()]
+    
+    def _parse_sequence_id(self, sequence_id: str) -> tuple[str, str, str]:
+        """Parse 'domain/difficulty/seq_id' into components."""
+        parts = sequence_id.split("/")
+        if len(parts) != 3:
+            raise ValueError(f"Invalid sequence_id format: {sequence_id}")
+        return tuple(parts)
+    
+    def get_sequence(self, sequence_id: str) -> TartanAirSequence:
+        domain, difficulty, seq_id = self._parse_sequence_id(sequence_id)
+        seq_dir = self.root_dir / domain / difficulty / seq_id
+        if not seq_dir.exists():
+            raise FileNotFoundError(f"Sequence directory not found: {seq_dir}")
+        
+        return TartanAirSequence(
             id=sequence_id,
-            dataset_name="TartanAir",
+            dataset_name="tartanair",
             sequence_dir=seq_dir,
-            ground_truth_file=self.poses_dir / f"{sequence_id}.txt",
+            ground_truth_file=seq_dir / "groundtruth.txt",
             timestamps_file=seq_dir / "times.txt",
+            domain=domain,
+            difficulty=difficulty,
         )
 
-    def load_ground_truth(self, sequence: Sequence) -> Trajectory:
+    def load_ground_truth(self, sequence: TartanAirSequence) -> Trajectory:
         """
         Load TartanAir ground truth poses.
 
@@ -74,3 +131,15 @@ class TartanAirDataset(Dataset):
             poses=poses,
             frame_ids=frame_ids,
         )
+        
+    def list_domains(self) -> list[str]:
+        """List all available domains."""
+        return list(set(d for d, _, _ in self._discover_sequences()))
+    
+    def list_by_domain(self, domain: str) -> list[str]:
+        """List sequences for a specific domain."""
+        return [f"{d}/{diff}/{s}" for d, diff, s in self._discover_sequences() if d == domain]
+    
+    def list_by_difficulty(self, difficulty: str) -> list[str]:
+        """List sequences for a specific difficulty."""
+        return [f"{d}/{diff}/{s}" for d, diff, s in self._discover_sequences() if diff == difficulty]

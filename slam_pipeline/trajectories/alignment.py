@@ -9,74 +9,13 @@ Licensed under BSD 3-Clause License.
 import numpy as np
 from slam_pipeline.trajectories.trajectory import Trajectory
 import slam_pipeline.utils.lie_algebra as lie
+from slam_pipeline.trajectories.trajectory import scale, transform
+from slam_pipeline.trajectories.matching import MatchedPair
 
 UmeyamaResult = tuple[np.ndarray, np.ndarray, float]
 
 class GeometryException(Exception):
     pass
-
-def scale(
-    traj: Trajectory, 
-    scale_factor: float
-) -> Trajectory:
-    """
-    Scales the trajectory by the given scale factor.
-    
-    Args:
-        traj: Trajectory to be scaled
-        scale_factor: Scale factor to apply
-    
-    Returns:
-        Scaled Trajectory
-    """
-    scaled_poses = traj.poses.copy()
-    scaled_poses[:, :3, 3] *= scale_factor
-    return Trajectory(
-        stamps=traj.stamps,
-        poses=scaled_poses,
-        frame_ids=traj.frame_ids,
-        tracking_states=traj.tracking_states
-    )
-
-def transform(
-    traj: Trajectory,
-    T: np.ndarray,
-    right_mul: bool = False,
-    propagate: bool = False
-) -> Trajectory:
-    """
-    Apply a left or right multiplicative transformation to the whole trajectory.
-    
-    Args:
-        traj: Trajectory to be transformed
-        T: 4x4 transformation matrix (e.g. SE(3) or Sim(3))
-        right_mul: Whether to apply right-multiplicative
-        propagate: Whether to propagate drift with RHS transformations
-    
-    Returns:
-        Transformed Trajectory
-    """
-    transformed_poses = traj.poses.copy()
-    
-    if right_mul and not propagate:
-        transformed_poses = transformed_poses @ T
-    elif right_mul and propagate:
-        ids = np.arange(0, traj.poses.shape[0], 1, dtype=int)
-        rel_poses = [
-            lie.relative_se3(traj.poses[i], traj.poses[i + 1]) @ T for i in ids[:-1]
-        ]
-        transformed_poses[0] = transformed_poses[0] 
-        for i in ids[1:]:
-            transformed_poses[i] = transformed_poses[i-1] @ rel_poses[i-1]
-    else:
-        transformed_poses = T @ transformed_poses
-    
-    return Trajectory(
-        stamps=traj.stamps,
-        poses=transformed_poses,
-        frame_ids=traj.frame_ids,
-        tracking_states=traj.tracking_states
-    )
 
 def align(
     est_traj: Trajectory, 
@@ -118,6 +57,40 @@ def align(
     else:
         # Only apply SE(3) transformation (no scale)
         aligned_est = transform(est_traj, lie.se3(r, t))
+        return aligned_est, r, t, c
+
+def align_valid_only(
+    matched: MatchedPair,
+    with_scale: bool = False
+) -> tuple[Trajectory, np.ndarray, np.ndarray, float]:
+    """
+    Aligns the estimated trajectory to the ground truth trajectory using only valid tracking frames.
+    
+    Args:
+        matched: MatchedPair containing estimated and ground truth trajectories
+        with_scale: Whether to estimate scale factor (True for monocular SLAM)
+    
+    Returns:
+        aligned_est: Aligned estimated trajectory
+        r: Rotation matrix (3x3)
+        t: Translation vector (3,)
+        c: Scale factor
+    """
+    valid_mask = matched.valid_frame_mask[matched.matched_frame_ids]
+    
+    est_positions = matched.est.poses[valid_mask, :3, 3].T  # Shape (3, M_valid)
+    gt_positions = matched.gt.poses[valid_mask, :3, 3].T      # Shape (3, M_valid)
+    
+    r, t, c = umeyama_alignment(est_positions, gt_positions, with_scale)
+
+    if with_scale:
+        # Apply scale first, then SE(3) transformation
+        scaled_est_traj = scale(matched.est, c)
+        aligned_est = transform(scaled_est_traj, lie.se3(r, t))
+        return aligned_est, r, t, c
+    else:
+        # Only apply SE(3) transformation (no scale)
+        aligned_est = transform(matched.est, lie.se3(r, t))
         return aligned_est, r, t, c
 
 def umeyama_alignment(

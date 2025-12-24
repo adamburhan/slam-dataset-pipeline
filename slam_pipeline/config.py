@@ -8,11 +8,15 @@ class DatasetConfig:
     name: str
     root_dir: str
     sequences: List[str] = field(default_factory=list)
+    domains: Optional[List[str]] = None
+    difficulties: Optional[List[str]] = None
 
 @dataclass
 class SystemConfig:
     name: str
     docker_image: str
+    display: bool = True
+    mount_slam: bool = False
     runtime: str = "docker"
     runtime_args: Dict[str, Any] = field(default_factory=dict)
 

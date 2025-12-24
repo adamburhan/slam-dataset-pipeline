@@ -25,6 +25,8 @@ def get_dataset(config: Any) -> Dataset:
     if name == "kitti":
         return KittiDataset(root_path)
     elif name == "tartanair":
-        return TartanAirDataset(root_path)
+        domains = getattr(config, 'domains', config.get('domains') if isinstance(config, dict) else None)
+        difficulties = getattr(config, 'difficulties', config.get('difficulties') if isinstance(config, dict) else None)
+        return TartanAirDataset(root_path, domains=domains, difficulties=difficulties)
     else:
         raise ValueError(f"Unknown dataset: {name}")

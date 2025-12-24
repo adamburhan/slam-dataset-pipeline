@@ -3,9 +3,9 @@ import numpy as np
 from slam_pipeline.datasets.factory import get_dataset
 from slam_pipeline.slam_systems.factory import get_system
 from slam_pipeline.trajectories.matching import prepare_matched_pair
-from slam_pipeline.trajectories.alignment import align
+from slam_pipeline.trajectories.alignment import align, align_valid_only
 from slam_pipeline.metrics.rpe import compute_rpe
-from slam_pipeline.trajectories.trajectory import TrajFormat
+from slam_pipeline.trajectories.trajectory import TrajFormat, fill_and_correct_trajectory
 
 
 class Pipeline:
@@ -46,6 +46,7 @@ class Pipeline:
             fill_policy=loading_cfg.fill_policy
         )
         
+        
         valid_ratio = matched.num_valid() / N
         
         # Check for filled frames
@@ -57,17 +58,22 @@ class Pipeline:
         print(f"\nSeq {sequence_id}: {N} frames, {matched.num_valid()}/{N} valid ({valid_ratio:.2%})")
         if num_filled > 0:
             print(f"  Filled frames: {num_filled} ({(num_filled/N):.2%})")
+            
+        matched.est = matched.est.anchor_to_first_valid()
+        matched.gt = matched.gt.anchor_to_first_valid()
         
         # 4. Align (Parameterized)
         align_cfg = self.cfg.pipeline.alignment
         use_sim3 = align_cfg.method == "sim3"
         
-        aligned_est, _, _, scale = align(matched.est, matched.gt, with_scale=use_sim3)
+        #aligned_est, _, _, scale = align(matched.est, matched.gt, with_scale=use_sim3)
+        aligned_est, _, _, scale = align_valid_only(matched, with_scale=use_sim3)
         matched.est = aligned_est
-        
+        #matched.est = fill_and_correct_trajectory(matched.est)
         # 5. Compute Metrics
         # TODO: Iterate over self.cfg.pipeline.metrics list
         rpe_trans, rpe_rot = compute_rpe(matched)
+        #rpe_trans, rpe_rot = compute_rpe_normalized(matched)
         
         # 6. Convert to dense
         dense_rpe_trans = matched.to_dense_rpe(rpe_trans, num_frames=N)
