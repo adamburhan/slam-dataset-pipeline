@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 3 ]]; then
-  echo "Usage: $0 <dataset> <sequence> <output_path>" >&2
+if [[ "$#" -ne 4 ]]; then
+  echo "Usage: $0 <dataset> <sequence> <output_path> <useDisplay>" >&2
   exit 1
 fi
 
 DATASET="$(echo "$1" | tr '[:lower:]' '[:upper:]')"
 SEQUENCE="$2"
 OUTPUT_PATH="$3"
+useDisplay="$4"
 
 cd /dpds/ORB_SLAM2
 
@@ -30,6 +31,12 @@ case "$DATASET" in
     VOCAB_FILE="Vocabulary/ORBvoc.txt"
     CONFIG_FILE="Examples/Monocular/EuRoC.yaml"
     SEQ_PATH="/data/EuRoC/$SEQUENCE"
+    ;;
+  "TARTANAIR")
+    EXECUTABLE="./Examples/Monocular/mono_tartanair"
+    VOCAB_FILE="Vocabulary/ORBvoc.txt"
+    CONFIG_FILE="Examples/Monocular/tartanAir.yaml"
+    SEQ_PATH="/data/tartanair/$SEQUENCE"
     ;;
   *)
     echo "Unsupported dataset: $DATASET" >&2
@@ -74,8 +81,20 @@ fi
   date -Is
 } > "$OUTPUT_PATH/run_manifest.txt"
 
-cmd=("$EXECUTABLE" "$VOCAB_FILE" "$CONFIG_FILE" "$SEQ_PATH")
-"${cmd[@]}" > "$OUTPUT_PATH/slam_output.txt" 2>&1
+if [[ ! -f "$EXECUTABLE" ]]; then
+  echo "Error: Executable '$EXECUTABLE' not found!" >&2
+  ls -l Examples/Monocular/ >&2
+  exit 3
+fi
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "Error: Config file '$CONFIG_FILE' not found!" >&2
+  exit 4
+fi
+
+cmd=("$EXECUTABLE" "$VOCAB_FILE" "$CONFIG_FILE" "$SEQ_PATH" "$useDisplay")
+echo "Running: ${cmd[*]}"
+"${cmd[@]}" 2>&1 | tee "$OUTPUT_PATH/slam_output.txt"
 
 # Use cp instead of mv to avoid ownership preservation issues with Docker volumes
 cp track_thread_poses.txt "$OUTPUT_PATH/track_thread_poses.txt" || true

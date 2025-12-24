@@ -67,5 +67,5 @@ def plot_rpe(rpe_trans, rpe_rot, save_dir: Path):
     ax2.legend(loc='upper right')
     
     plt.tight_layout()
-    plt.savefig(save_dir / "rpe_plot_filled.png", dpi=150)
+    plt.savefig(save_dir / f"rpe_plot.png", dpi=150)
     plt.close(fig)

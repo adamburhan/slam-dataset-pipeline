@@ -1,13 +1,18 @@
 # 1. Dataset Configuration
 dataset:
   name: "tartanair"  # kitti, tum, euroc
-  root_dir: "/media/adam/external_hd/tartanair/abandonedfactory_Easy_image_left/abandonedfactory/"
+  domains: ["abandonedfactory"]
+  difficulties: ["Easy", "Hard"]
+  #root_dir: "/media/adam/external_hd/tartanair/"
+  root_dir: "/home/adam/Downloads/tartanair/"
   # sequences: ["04", "01"] # Optional: can be overridden by CLI for Slurm
 
 # 2. System / Runtime Configuration
 system:
   name: "orbslam2"
   docker_image: "orbslam2:latest" # Crucial for reproducibility
+  display: true
+  mount_slam: false
   # Optional: runtime specific args
   runtime_args:
     network: "host"

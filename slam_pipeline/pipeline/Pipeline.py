@@ -66,14 +66,11 @@ class Pipeline:
         align_cfg = self.cfg.pipeline.alignment
         use_sim3 = align_cfg.method == "sim3"
         
-        #aligned_est, _, _, scale = align(matched.est, matched.gt, with_scale=use_sim3)
         aligned_est, _, _, scale = align_valid_only(matched, with_scale=use_sim3)
         matched.est = aligned_est
-        #matched.est = fill_and_correct_trajectory(matched.est)
         # 5. Compute Metrics
         # TODO: Iterate over self.cfg.pipeline.metrics list
         rpe_trans, rpe_rot = compute_rpe(matched)
-        #rpe_trans, rpe_rot = compute_rpe_normalized(matched)
         
         # 6. Convert to dense
         dense_rpe_trans = matched.to_dense_rpe(rpe_trans, num_frames=N)
