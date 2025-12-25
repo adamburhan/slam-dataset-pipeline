@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
@@ -84,6 +85,16 @@ class MatchedPair:
         Returns (N-1,) boolean array.
         """
         return self.valid_frame_mask[:-1] & self.valid_frame_mask[1:]
+    
+    def anchor_to_first_valid(self) -> MatchedPair:
+        valid_mask = self.valid_frame_mask[self.matched_frame_ids]
+        if not valid_mask.any():
+            raise ValueError("No valid tracking frames to anchor to.")
+        k = int(np.argmax(valid_mask))
+        self.est = self.est.anchor(k)
+        self.gt = self.gt.anchor(k)
+        return self
+
 
 def prepare_matched_pair(
     dataset: Dataset,

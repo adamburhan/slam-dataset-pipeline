@@ -59,8 +59,7 @@ class Pipeline:
         if num_filled > 0:
             print(f"  Filled frames: {num_filled} ({(num_filled/N):.2%})")
             
-        matched.est = matched.est.anchor_to_first_valid()
-        matched.gt = matched.gt.anchor_to_first_valid()
+        matched.anchor_to_first_valid()
         
         # 4. Align (Parameterized)
         align_cfg = self.cfg.pipeline.alignment
@@ -78,8 +77,12 @@ class Pipeline:
         
         print(f"  Scale: {scale:.2f}")
         print(f"  RPE trans - mean: {np.nanmean(dense_rpe_trans):.4f}m, max: {np.nanmax(dense_rpe_trans):.4f}m")
-        print(f"  Valid RPE: {(~np.isnan(dense_rpe_trans)).sum()}/{N-1}")
-        
+        print(f"  Strict-valid RPE: {strict_valid_rpe_mask.sum()}/{N-1}")
+        print(f"  Exists RPE: {exists_mask.sum()}/{N-1}")
+
+        strict_valid_rpe_mask = matched.get_rpe_valid_mask()   # shape (N-1,)
+        exists_mask = ~np.isnan(dense_rpe_trans)               # shape (N-1,)
+
         # 7. Construct Result Dictionary
         results = {
             "sequence_id": sequence_id,
@@ -87,10 +90,11 @@ class Pipeline:
             "scale_factor": scale,
             "rpe_trans_mean": np.nanmean(dense_rpe_trans),
             "rpe_trans_max": np.nanmax(dense_rpe_trans),
-            #"trajectory_path": str(slam_output.trajectory_path),
+            "trajectory_path": str(slam_output.trajectory_path),
             "dense_rpe_trans": dense_rpe_trans,
             "dense_rpe_rot": dense_rpe_rot,
-            "validity_mask": ~np.isnan(dense_rpe_trans)
+            "exists_mask": exists_mask,
+            "validity_mask": strict_valid_rpe_mask
         }
         
         # 8. Save Results
@@ -129,6 +133,7 @@ class Pipeline:
             rpe_trans=results["dense_rpe_trans"],
             rpe_rot=results["dense_rpe_rot"],
             validity_mask=results["validity_mask"],
+            exists_mask=results["exists_mask"],
             scale_factor=results["scale_factor"]
         )
         print(f"Saved labels to {npz_path}")

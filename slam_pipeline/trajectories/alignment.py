@@ -78,7 +78,10 @@ def align_valid_only(
         c: Scale factor
     """
     valid_mask = matched.valid_frame_mask[matched.matched_frame_ids]
-    
+
+    if valid_mask.sum() < 3:
+        raise GeometryException("Not enough valid poses for Umeyama alignment")
+
     est_positions = matched.est.poses[valid_mask, :3, 3].T  # Shape (3, M_valid)
     gt_positions = matched.gt.poses[valid_mask, :3, 3].T      # Shape (3, M_valid)
     

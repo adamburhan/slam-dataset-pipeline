@@ -69,7 +69,6 @@ class Trajectory:
     def anchor_to_first_valid(self) -> Trajectory:
         return self.anchor(self.first_valid_index())
 
-
     def to_evo(self):
         pass
     @staticmethod
@@ -145,6 +144,7 @@ def fill_and_correct_trajectory(traj: Trajectory) -> Trajectory:
     
     # We need to update validity dynamically as we fill
     valid = is_track_valid(states)
+    original_valid = valid.copy()
     if valid.all():
         return traj
     
@@ -208,7 +208,7 @@ def fill_and_correct_trajectory(traj: Trajectory) -> Trajectory:
             
             # Apply correction to the contiguous valid segment after the gap
             k = gap_end
-            while k < N and valid[k]: 
+            while k < N and original_valid[k]: 
                 poses[k] = T_corr @ poses[k]
                 k += 1
                 

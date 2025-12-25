@@ -38,6 +38,7 @@ class LoadingConfig:
 class AlignmentConfig:
     method: str = "sim3"
     align_ground_truth: bool = False
+    only_scale: bool = False
 
 @dataclass
 class OutputConfig:
