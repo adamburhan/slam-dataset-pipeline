@@ -61,7 +61,8 @@ def align(
 
 def align_valid_only(
     matched: MatchedPair,
-    with_scale: bool = False
+    with_scale: bool = False,
+    only_scale: bool = False
 ) -> tuple[Trajectory, np.ndarray, np.ndarray, float]:
     """
     Aligns the estimated trajectory to the ground truth trajectory using only valid tracking frames.
@@ -83,7 +84,10 @@ def align_valid_only(
     
     r, t, c = umeyama_alignment(est_positions, gt_positions, with_scale)
 
-    if with_scale:
+    if only_scale:
+        scaled_est_traj = scale(matched.est, c)
+        return scaled_est_traj, r, t, c
+    elif with_scale:
         # Apply scale first, then SE(3) transformation
         scaled_est_traj = scale(matched.est, c)
         aligned_est = transform(scaled_est_traj, lie.se3(r, t))

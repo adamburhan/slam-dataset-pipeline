@@ -50,14 +50,31 @@ class MatchedPair:
         num_frames: int,
         fill_value: float = np.nan
     ) -> np.ndarray:
-        """Convert RPE (M-1,) to dense (N-1,) array."""
+        """
+        Convert matched RPE to dense RPE array for motion-model-filled trajectory.
+        
+        After motion model preprocessing, the trajectory is continuous (N frames).
+        This method maps RPE from matched pairs to the dense frame sequence,
+        filling only consecutive frame pairs (delta=1).
+        
+        Args:
+            rpe_values: (M-1,) RPE errors computed on matched trajectory
+            num_frames: Total frames in preprocessed sequence (N)
+            fill_value: Value for frames not in matched pairs (default: NaN)
+            
+        Returns:
+            (N-1,) array where dense[i] = RPE between frame i and i+1
+            Only consecutive matched pairs are filled; gaps remain NaN.
+        """
         dense = np.full(num_frames - 1, fill_value)
         
         for i in range(len(rpe_values)):
-            frame_idx = self.matched_frame_ids[i]
+            # In the case where frame indices are not contiguous
+            frame_idx_0 = self.matched_frame_ids[i]
+            frame_idx_1 = self.matched_frame_ids[i + 1]
             # RPE[i] is error between frame_idx and frame_idx+1
-            if frame_idx < num_frames - 1:
-                dense[frame_idx] = rpe_values[i]
+            if frame_idx_1 == frame_idx_0 + 1:
+                dense[frame_idx_0] = rpe_values[i]
         
         return dense
     

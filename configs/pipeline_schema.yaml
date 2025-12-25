@@ -33,6 +33,7 @@ pipeline:
   # B. Alignment (Sim3 vs SE3)
   alignment:
     method: "sim3" # sim3 (with scale), se3 (rigid), or none
+    only_scale: false # whether to only apply scale without rotation/translation
     align_ground_truth: false # usually we align est to gt
 
   # C. Metrics to Compute

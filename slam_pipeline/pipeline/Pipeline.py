@@ -66,7 +66,7 @@ class Pipeline:
         align_cfg = self.cfg.pipeline.alignment
         use_sim3 = align_cfg.method == "sim3"
         
-        aligned_est, _, _, scale = align_valid_only(matched, with_scale=use_sim3)
+        aligned_est, _, _, scale = align_valid_only(matched, with_scale=use_sim3, only_scale=align_cfg.only_scale)
         matched.est = aligned_est
         # 5. Compute Metrics
         # TODO: Iterate over self.cfg.pipeline.metrics list
