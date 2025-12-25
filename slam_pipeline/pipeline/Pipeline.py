@@ -75,13 +75,13 @@ class Pipeline:
         dense_rpe_trans = matched.to_dense_rpe(rpe_trans, num_frames=N)
         dense_rpe_rot = matched.to_dense_rpe(rpe_rot, num_frames=N)
         
+        strict_valid_rpe_mask = matched.get_rpe_valid_mask()   # shape (N-1,)
+        exists_mask = ~np.isnan(dense_rpe_trans)               # shape (N-1,)
+        
         print(f"  Scale: {scale:.2f}")
         print(f"  RPE trans - mean: {np.nanmean(dense_rpe_trans):.4f}m, max: {np.nanmax(dense_rpe_trans):.4f}m")
         print(f"  Strict-valid RPE: {strict_valid_rpe_mask.sum()}/{N-1}")
         print(f"  Exists RPE: {exists_mask.sum()}/{N-1}")
-
-        strict_valid_rpe_mask = matched.get_rpe_valid_mask()   # shape (N-1,)
-        exists_mask = ~np.isnan(dense_rpe_trans)               # shape (N-1,)
 
         # 7. Construct Result Dictionary
         results = {
