@@ -14,11 +14,12 @@ class DatasetConfig:
 @dataclass
 class SystemConfig:
     name: str
-    docker_image: str
     display: bool = True
     mount_slam: bool = False
     runtime: str = "docker"
     runtime_args: Dict[str, Any] = field(default_factory=dict)
+    docker_image: Optional[str] = None
+    sif_path: Optional[str] = None
 
 @dataclass
 class AssociationConfig:
@@ -73,7 +74,10 @@ class ExperimentConfig:
         system_data = data['system']
         system_cfg = SystemConfig(
             name=system_data['name'],
+            display=system_data.get('display', True),
+            mount_slam=system_data.get('mount_slam', False),
             docker_image=system_data.get('docker_image', ''),
+            sif_path=system_data.get('sif_path', ''),
             runtime=system_data.get('runtime', 'docker'),
             runtime_args=system_data.get('runtime_args', {})
         )
