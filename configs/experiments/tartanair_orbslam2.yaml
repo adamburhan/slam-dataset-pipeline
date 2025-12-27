@@ -3,15 +3,16 @@ dataset:
   name: "tartanair"  # kitti, tum, euroc
   #domains: ["abandonedfactory"]
   difficulties: ["Easy", "Hard"]
-  root_dir: "/home/adamb14/scratch/ood_slam/datasets/tartanair"
+  root_dir: "/home/adam/Downloads/tartanair/"
   # sequences: ["04", "01"] # Optional: can be overridden by CLI for Slurm
 
 # 2. System / Runtime Configuration
 system:
   name: "orbslam2"
   runtime: "singularity"
-  sif_path: "orbslam2:latest" # Crucial for reproducibility
-  display: false
+  sif_path: "orbslam2.sif" # Crucial for reproducibility
+  docker_image: "orbslam2:latest" # Ignored if using singularity
+  display: true
   mount_slam: false
   # Optional: runtime specific args
   runtime_args:
@@ -46,5 +47,5 @@ pipeline:
   output:
     save_trajectory: true
     save_plots: true
-    save_npz: true # The ML dataset format
-    output_dir: "results"
+    save_labels: true # The ML dataset format
+    output_dir: "/home/adam/Downloads/output_test_singularity_results"

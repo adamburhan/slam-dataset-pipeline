@@ -18,7 +18,7 @@ class ORBSLAMSystem(SLAMSystem):
         
         # Define volumes
         volumes = {
-            sequence.sequence_dir: f"/data/{sequence.dataset_name}/{sequence.id}",
+            sequence.dataset_root_dir: f"/datasets/{sequence.dataset_name}",
             output_dir: "/output"
         }
         
@@ -29,6 +29,7 @@ class ORBSLAMSystem(SLAMSystem):
             volumes[Path("/home/adam/Documents/MILA/projects/ORB_SLAM2")] = "/dpds/ORB_SLAM2"  # Mount local ORB_SLAM2 code
         
         # Define environment
+        env = {}
         if self.config.display:
             env = {
                 "DISPLAY": os.environ.get('DISPLAY', ''),
@@ -44,7 +45,7 @@ class ORBSLAMSystem(SLAMSystem):
             "1" if self.config.display else "0"
         ]
         
-        image = self.config.docker_image
+        image = self.config.docker_image if self.config.runtime == "docker" else self.config.sif_path
         
         ret_code = self.runtime.run(
             image=image,

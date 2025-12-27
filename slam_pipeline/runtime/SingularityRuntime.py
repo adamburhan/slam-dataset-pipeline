@@ -51,8 +51,7 @@ class SingularityRuntime(ContainerRuntime):
         # Note: Singularity usually streams output to stdout/stderr directly
         result = subprocess.run(
             sing_cmd,
-            capture_output=True,
-            text=True
+            check=False
         )
         
         if result.returncode != 0:

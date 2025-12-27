@@ -45,7 +45,7 @@ class AlignmentConfig:
 class OutputConfig:
     save_trajectory: bool = True
     save_plots: bool = True
-    save_npz: bool = True
+    save_labels: bool = True
     output_dir: str = "results"
 
 @dataclass

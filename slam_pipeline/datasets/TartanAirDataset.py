@@ -80,6 +80,7 @@ class TartanAirDataset(Dataset):
             id=sequence_id,
             dataset_name="tartanair",
             sequence_dir=seq_dir,
+            dataset_root_dir=self.root_dir,
             ground_truth_file=seq_dir / "groundtruth.txt",
             timestamps_file=seq_dir / "times.txt",
             domain=domain,

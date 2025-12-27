@@ -14,6 +14,7 @@ class Sequence:
 
     # sequence root (contains image_0/, times.txt, calib, etc.)
     sequence_dir: Path
+    dataset_root_dir: Path
 
     ground_truth_file: Optional[Path] = None
     timestamps_file: Optional[Path] = None

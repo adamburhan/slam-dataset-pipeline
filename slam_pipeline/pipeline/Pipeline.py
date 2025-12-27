@@ -98,8 +98,9 @@ class Pipeline:
         }
         
         # 8. Save Results
-        if self.cfg.pipeline.output.save_npz:
-            self.save_results(results, output_dir)
+        if self.cfg.pipeline.output.save_labels:
+            #self.save_results(results, output_dir)
+            self.save_results_csv(results, output_dir)
         
         # 9. Plot Results
         if self.cfg.pipeline.output.save_plots:
@@ -137,3 +138,30 @@ class Pipeline:
             scale_factor=results["scale_factor"]
         )
         print(f"Saved labels to {npz_path}")
+        
+    def save_results_csv(self, results, output_dir: Path):
+        import csv
+
+        csv_path = output_dir / "labels.csv"
+        N = len(results["dense_rpe_trans"])
+
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "frame_id",
+                "rpe_trans",
+                "rpe_rot",
+                "exists",
+                "valid"
+            ])
+
+            for i in range(N):
+                writer.writerow([
+                    i,
+                    results["dense_rpe_trans"][i],
+                    results["dense_rpe_rot"][i],
+                    int(results["exists_mask"][i]),
+                    int(results["validity_mask"][i]),
+                ])
+
+        print(f"Saved labels to {csv_path}")

@@ -18,25 +18,26 @@ case "$DATASET" in
     EXECUTABLE="./Examples/Monocular/mono_kitti"
     VOCAB_FILE="Vocabulary/ORBvoc.txt"
     CONFIG_FILE="Examples/Monocular/KITTI00-02.yaml"   # default; overridden below
-    SEQ_PATH="/data/KITTI/$SEQUENCE"
+    SEQ_PATH="/datasets/kitti/sequences/$SEQUENCE"
     ;;
   "TUM")
     EXECUTABLE="./Examples/Monocular/mono_tum"
     VOCAB_FILE="Vocabulary/ORBvoc.txt"
     CONFIG_FILE="Examples/Monocular/TUM1.yaml"
-    SEQ_PATH="/data/TUM/$SEQUENCE"
+    SEQ_PATH="/datasets/tum/$SEQUENCE"
     ;;
   "EUROC")
     EXECUTABLE="./Examples/Monocular/mono_euroc"
     VOCAB_FILE="Vocabulary/ORBvoc.txt"
     CONFIG_FILE="Examples/Monocular/EuRoC.yaml"
-    SEQ_PATH="/data/EuRoC/$SEQUENCE"
+    SEQ_PATH="/datasets/euroc/$SEQUENCE/mav0/cam0/data"
+    TIMES_FILE="Examples/Monocular/EuRoC_TimeStamps/${SEQUENCE}.txt"
     ;;
   "TARTANAIR")
     EXECUTABLE="./Examples/Monocular/mono_tartanair"
     VOCAB_FILE="Vocabulary/ORBvoc.txt"
     CONFIG_FILE="Examples/Monocular/tartanAir.yaml"
-    SEQ_PATH="/data/tartanair/$SEQUENCE"
+    SEQ_PATH="/datasets/tartanair/$SEQUENCE"
     ;;
   *)
     echo "Unsupported dataset: $DATASET" >&2
@@ -78,6 +79,9 @@ fi
   echo "config=$CONFIG_FILE"
   echo "seq_path=$SEQ_PATH"
   echo "output_path=$OUTPUT_PATH"
+  if [[ "$DATASET" == "EUROC" ]]; then
+    echo "times_file=$TIMES_FILE"
+  fi
   date -Is
 } > "$OUTPUT_PATH/run_manifest.txt"
 
@@ -92,13 +96,15 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 4
 fi
 
-cmd=("$EXECUTABLE" "$VOCAB_FILE" "$CONFIG_FILE" "$SEQ_PATH" "$useDisplay")
+if [[ "$DATASET" == "EUROC" ]]; then
+  if [[ ! -f "$TIMES_FILE" ]]; then
+    echo "Error: Times file '$TIMES_FILE' not found!" >&2
+    exit 5
+  fi
+  cmd=("$EXECUTABLE" "$VOCAB_FILE" "$CONFIG_FILE" "$SEQ_PATH" "$TIMES_FILE" "$useDisplay" "$OUTPUT_PATH")
+else
+  cmd=("$EXECUTABLE" "$VOCAB_FILE" "$CONFIG_FILE" "$SEQ_PATH" "$useDisplay" "$OUTPUT_PATH")
+fi
+
 echo "Running: ${cmd[*]}"
 "${cmd[@]}" 2>&1 | tee "$OUTPUT_PATH/slam_output.txt"
-
-# Use cp instead of mv to avoid ownership preservation issues with Docker volumes
-cp track_thread_poses.txt "$OUTPUT_PATH/track_thread_poses.txt" || true
-cp KeyFrameTrajectory.txt "$OUTPUT_PATH/KeyFrameTrajectory.txt" || true
-
-# Clean up the original files
-rm -f track_thread_poses.txt KeyFrameTrajectory.txt

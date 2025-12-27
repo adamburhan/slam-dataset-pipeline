@@ -19,8 +19,9 @@ class KittiDataset(Dataset):
         seq_dir = self.sequences_dir / sequence_id
         return Sequence(
             id=sequence_id,
-            dataset_name="KITTI",
+            dataset_name="kitti",
             sequence_dir=seq_dir,
+            dataset_root_dir=self.root_dir,
             ground_truth_file=self.poses_dir / f"{sequence_id}.txt",
             timestamps_file=seq_dir / "times.txt",
         )
