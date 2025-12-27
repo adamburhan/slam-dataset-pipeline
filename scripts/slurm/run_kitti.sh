@@ -39,10 +39,17 @@ cp -r "${DATASET_ROOT}/poses" "$SLURM_TMPDIR/"
 echo "Staged to $SLURM_TMPDIR:"
 ls -la "$SLURM_TMPDIR"
 
-# srun python scripts/run_sequence_cli.py \
-#     --config "$CONFIG_FILE" \
-#     --sequence_id "$sequence_id" \
-#     --dataset_root "$SLURM_TMPDIR" \
-#     --output_dir "results"
+mkdir -p "$SLURM_TMPDIR/results"
 
-# echo "End: $(date)"
+srun python scripts/run_sequence_cli.py \
+    --config "$CONFIG_FILE" \
+    --sequence_id "$sequence_id" \
+    --dataset_root "$SLURM_TMPDIR" \
+    --output_dir "$SLURM_TMPDIR/results"
+
+# Copy results back to persistent storage
+OUTPUT_ROOT="/scratch/adamb14/ood_slam/results/kitti/orbslam2"
+mkdir -p "${OUTPUT_ROOT}/${sequence_id}"
+cp -r "$SLURM_TMPDIR/results/"* "${OUTPUT_ROOT}/${sequence_id}/"
+
+echo "End: $(date)"
