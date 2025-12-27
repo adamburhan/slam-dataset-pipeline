@@ -26,6 +26,7 @@ class Pipeline:
         slam_output = slam_system.run(sequence, output_dir)
         if slam_output is None:
             print(f"SLAM failed for sequence {sequence_id}")
+            # TODO: Save metrics.json with status="failed" and error message
             return None
 
         # 3. Match & Fill
@@ -70,6 +71,8 @@ class Pipeline:
         # 5. Compute Metrics
         # TODO: Iterate over self.cfg.pipeline.metrics list
         rpe_trans, rpe_rot = compute_rpe(matched)
+
+        # TODO: Compute ATE (we have RPE but not ATE currently)
         
         # 6. Convert to dense
         dense_rpe_trans = matched.to_dense_rpe(rpe_trans, num_frames=N)
@@ -96,11 +99,30 @@ class Pipeline:
             "exists_mask": exists_mask,
             "validity_mask": strict_valid_rpe_mask
         }
+
+        # TODO: Add these fields to results:
+        #   - dataset name
+        #   - system name
+        #   - config file path
+        #   - git hash (subprocess: git rev-parse --short HEAD)
+        #   - timestamp (datetime.now().isoformat())
+        #   - tracking stats: total_frames, tracked_frames, filled_frames, tracking_rate
+        #   - ATE stats: rmse, mean, median, std, min, max
+        #   - RPE stats: trans_rmse, trans_mean, rot_rmse, rot_mean (over valid only)
+        #   - timing: total_seconds
         
         # 8. Save Results
         if self.cfg.pipeline.output.save_labels:
             #self.save_results(results, output_dir)
             self.save_results_csv(results, output_dir)
+
+        # TODO: Always save metrics.json (not optional)
+        # self.save_metrics_json(results, output_dir)
+        
+        # TODO: Save trajectory files
+        # - trajectory_raw.txt (before alignment)
+        # - trajectory_aligned.txt (after alignment)
+        # - groundtruth.txt (matched GT poses)
         
         # 9. Plot Results
         if self.cfg.pipeline.output.save_plots:
@@ -165,3 +187,48 @@ class Pipeline:
                 ])
 
         print(f"Saved labels to {csv_path}")
+
+# TODO: Add this method
+    def save_metrics_json(self, results, output_dir: Path):
+        """Save machine-readable metrics for aggregation."""
+        metrics = {
+            "sequence_id": results["sequence_id"],
+            "dataset": "...",
+            "system": "...",
+            "config": "...",
+            "timestamp": "...",
+            "git_hash": "...",
+            "status": "success",
+            
+            "ate": {
+                "rmse": ...,
+                "mean": ...,
+                "median": ...,
+                "std": ...,
+                "min": ...,
+                "max": ...
+            },
+            
+            "rpe": {
+                "trans_rmse": ...,
+                "trans_mean": ...,
+                "rot_rmse": ...,
+                "rot_mean": ...
+            },
+            
+            "scale_factor": ...,
+            
+            "tracking": {
+                "total_frames": ...,
+                "tracked_frames": ...,
+                "filled_frames": ...,
+                "tracking_rate": ...
+            },
+            
+            "timing": {
+                "total_seconds": ...
+            }
+        }
+        
+        with open(output_dir / "metrics.json", "w") as f:
+            json.dump(metrics, f, indent=2)
