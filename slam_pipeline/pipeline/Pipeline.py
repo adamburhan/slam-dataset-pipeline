@@ -1,5 +1,11 @@
 from pathlib import Path
 import numpy as np
+import json
+import subprocess
+from datetime import datetime
+import time
+from dataclasses import asdict
+
 from slam_pipeline.datasets.factory import get_dataset
 from slam_pipeline.slam_systems.factory import get_system
 from slam_pipeline.trajectories.matching import prepare_matched_pair
@@ -8,11 +14,52 @@ from slam_pipeline.metrics.rpe import compute_rpe
 from slam_pipeline.trajectories.trajectory import TrajFormat, fill_and_correct_trajectory
 
 
+def get_git_hash():
+    """Get current git commit hash, or 'unknown' if not in a git repo."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+
+def compute_rpe_stats(values):
+    """Compute RPE statistics with sufficient statistics for aggregation."""
+    if len(values) == 0:
+        return {
+            "rmse": None,
+            "mean": None,
+            "median": None,
+            "std": None,
+            "min": None,
+            "max": None,
+            "sum": 0.0,
+            "sum_sq": 0.0,
+            "count": 0,
+        }
+    
+    return {
+        "rmse": float(np.sqrt(np.mean(values ** 2))),
+        "mean": float(np.mean(values)),
+        "median": float(np.median(values)),
+        "std": float(np.std(values)),
+        "min": float(np.min(values)),
+        "max": float(np.max(values)),
+        "sum": float(np.sum(values)),
+        "sum_sq": float(np.sum(values ** 2)),
+        "count": int(len(values)),
+    }
+
+
 class Pipeline:
     def __init__(self, cfg):
         self.cfg = cfg
         
     def run_sequence(self, sequence_id):
+        start_time = time.time()
+        
         # 1. Setup
         dataset = get_dataset(self.cfg.dataset)
         sequence = dataset.get_sequence(sequence_id)
@@ -26,7 +73,7 @@ class Pipeline:
         slam_output = slam_system.run(sequence, output_dir)
         if slam_output is None:
             print(f"SLAM failed for sequence {sequence_id}")
-            # TODO: Save metrics.json with status="failed" and error message
+            self.save_metrics_json_failed(sequence_id, sequence.dataset_name, output_dir, start_time)
             return None
 
         # 3. Match & Fill
@@ -47,16 +94,15 @@ class Pipeline:
             fill_policy=loading_cfg.fill_policy
         )
         
-        
-        valid_ratio = matched.num_valid() / N
+        tracked_frames = matched.num_valid()
+        valid_ratio = tracked_frames / N
         
         # Check for filled frames
         num_filled = 0
         if matched.est.tracking_states is not None:
-            # Assuming TRACKING_FILLED = 5
-            num_filled = (matched.est.tracking_states == 5).sum()
+            num_filled = int((matched.est.tracking_states == 5).sum())
             
-        print(f"\nSeq {sequence_id}: {N} frames, {matched.num_valid()}/{N} valid ({valid_ratio:.2%})")
+        print(f"\nSeq {sequence_id}: {N} frames, {tracked_frames}/{N} valid ({valid_ratio:.2%})")
         if num_filled > 0:
             print(f"  Filled frames: {num_filled} ({(num_filled/N):.2%})")
             
@@ -68,61 +114,79 @@ class Pipeline:
         
         aligned_est, _, _, scale = align_valid_only(matched, with_scale=use_sim3, only_scale=align_cfg.only_scale)
         matched.est = aligned_est
+        
         # 5. Compute Metrics
-        # TODO: Iterate over self.cfg.pipeline.metrics list
         rpe_trans, rpe_rot = compute_rpe(matched)
-
-        # TODO: Compute ATE (we have RPE but not ATE currently)
         
         # 6. Convert to dense
         dense_rpe_trans = matched.to_dense_rpe(rpe_trans, num_frames=N)
         dense_rpe_rot = matched.to_dense_rpe(rpe_rot, num_frames=N)
         
-        strict_valid_rpe_mask = matched.get_rpe_valid_mask()   # shape (N-1,)
-        exists_mask = ~np.isnan(dense_rpe_trans)               # shape (N-1,)
+        valid_mask = matched.get_rpe_valid_mask()
+        exists_mask = ~np.isnan(dense_rpe_trans)
+        
+        # Extract arrays for valid-only and exists (valid + filled)
+        rpe_trans_valid = dense_rpe_trans[valid_mask]
+        rpe_rot_valid = dense_rpe_rot[valid_mask]
+        rpe_trans_exists = dense_rpe_trans[exists_mask]
+        rpe_rot_exists = dense_rpe_rot[exists_mask]
         
         print(f"  Scale: {scale:.2f}")
         print(f"  RPE trans - mean: {np.nanmean(dense_rpe_trans):.4f}m, max: {np.nanmax(dense_rpe_trans):.4f}m")
-        print(f"  Strict-valid RPE: {strict_valid_rpe_mask.sum()}/{N-1}")
+        print(f"  Valid RPE: {valid_mask.sum()}/{N-1}")
         print(f"  Exists RPE: {exists_mask.sum()}/{N-1}")
 
         # 7. Construct Result Dictionary
+        total_seconds = time.time() - start_time
+        
         results = {
             "sequence_id": sequence_id,
-            "valid_ratio": valid_ratio,
-            "scale_factor": scale,
-            "rpe_trans_mean": np.nanmean(dense_rpe_trans),
-            "rpe_trans_max": np.nanmax(dense_rpe_trans),
+            "dataset": sequence.dataset_name,
+            "system": self.cfg.system.name,
+            "config": asdict(self.cfg),
+            "git_hash": get_git_hash(),
+            "timestamp": datetime.now().isoformat(),
+            "status": "success",
+            "scale_factor": float(scale),
             "trajectory_path": str(slam_output.trajectory_path),
+            
+            # Dense arrays for labels.csv
             "dense_rpe_trans": dense_rpe_trans,
             "dense_rpe_rot": dense_rpe_rot,
             "exists_mask": exists_mask,
-            "validity_mask": strict_valid_rpe_mask
+            "valid_mask": valid_mask,
+            
+            # RPE stats - valid only (no filled frames)
+            "rpe_valid": {
+                "trans": compute_rpe_stats(rpe_trans_valid),
+                "rot": compute_rpe_stats(rpe_rot_valid),
+            },
+            
+            # RPE stats - exists (valid + filled)
+            "rpe_exists": {
+                "trans": compute_rpe_stats(rpe_trans_exists),
+                "rot": compute_rpe_stats(rpe_rot_exists),
+            },
+            
+            # Tracking stats
+            "tracking": {
+                "total_frames": N,
+                "tracked_frames": tracked_frames,
+                "filled_frames": num_filled,
+                "tracking_rate": float(tracked_frames / N),
+            },
+            
+            # Timing
+            "timing": {
+                "total_seconds": round(total_seconds, 2),
+            },
         }
-
-        # TODO: Add these fields to results:
-        #   - dataset name
-        #   - system name
-        #   - config file path
-        #   - git hash (subprocess: git rev-parse --short HEAD)
-        #   - timestamp (datetime.now().isoformat())
-        #   - tracking stats: total_frames, tracked_frames, filled_frames, tracking_rate
-        #   - ATE stats: rmse, mean, median, std, min, max
-        #   - RPE stats: trans_rmse, trans_mean, rot_rmse, rot_mean (over valid only)
-        #   - timing: total_seconds
         
         # 8. Save Results
         if self.cfg.pipeline.output.save_labels:
-            #self.save_results(results, output_dir)
             self.save_results_csv(results, output_dir)
 
-        # TODO: Always save metrics.json (not optional)
-        # self.save_metrics_json(results, output_dir)
-        
-        # TODO: Save trajectory files
-        # - trajectory_raw.txt (before alignment)
-        # - trajectory_aligned.txt (after alignment)
-        # - groundtruth.txt (matched GT poses)
+        self.save_metrics_json(results, output_dir)
         
         # 9. Plot Results
         if self.cfg.pipeline.output.save_plots:
@@ -133,14 +197,12 @@ class Pipeline:
     def plot_results(self, results, matched, output_dir):
         from slam_pipeline.utils.plotting import plot_rpe, plot_trajectory
         
-        # Plot RPE
         plot_rpe(
             results["dense_rpe_trans"], 
             results["dense_rpe_rot"], 
             output_dir
         )
         
-        # Plot Trajectory
         plot_trajectory(
             matched.est.poses, 
             matched.gt.poses, 
@@ -148,19 +210,6 @@ class Pipeline:
         )
         print(f"Saved plots to {output_dir}")
 
-    def save_results(self, results, output_dir: Path):
-        """Saves the dense results to an .npz file for ML training."""
-        npz_path = output_dir / "labels.npz"
-        np.savez_compressed(
-            npz_path,
-            rpe_trans=results["dense_rpe_trans"],
-            rpe_rot=results["dense_rpe_rot"],
-            validity_mask=results["validity_mask"],
-            exists_mask=results["exists_mask"],
-            scale_factor=results["scale_factor"]
-        )
-        print(f"Saved labels to {npz_path}")
-        
     def save_results_csv(self, results, output_dir: Path):
         import csv
 
@@ -183,52 +232,50 @@ class Pipeline:
                     results["dense_rpe_trans"][i],
                     results["dense_rpe_rot"][i],
                     int(results["exists_mask"][i]),
-                    int(results["validity_mask"][i]),
+                    int(results["valid_mask"][i]),
                 ])
 
         print(f"Saved labels to {csv_path}")
 
-# TODO: Add this method
     def save_metrics_json(self, results, output_dir: Path):
         """Save machine-readable metrics for aggregation."""
         metrics = {
             "sequence_id": results["sequence_id"],
-            "dataset": "...",
-            "system": "...",
-            "config": "...",
-            "timestamp": "...",
-            "git_hash": "...",
-            "status": "success",
-            
-            "ate": {
-                "rmse": ...,
-                "mean": ...,
-                "median": ...,
-                "std": ...,
-                "min": ...,
-                "max": ...
-            },
-            
-            "rpe": {
-                "trans_rmse": ...,
-                "trans_mean": ...,
-                "rot_rmse": ...,
-                "rot_mean": ...
-            },
-            
-            "scale_factor": ...,
-            
-            "tracking": {
-                "total_frames": ...,
-                "tracked_frames": ...,
-                "filled_frames": ...,
-                "tracking_rate": ...
-            },
-            
-            "timing": {
-                "total_seconds": ...
-            }
+            "dataset": results["dataset"],
+            "system": results["system"],
+            "config": results["config"],
+            "timestamp": results["timestamp"],
+            "git_hash": results["git_hash"],
+            "status": results["status"],
+            "scale_factor": results["scale_factor"],
+            "rpe_valid": results["rpe_valid"],
+            "rpe_exists": results["rpe_exists"],
+            "tracking": results["tracking"],
+            "timing": results["timing"],
         }
         
         with open(output_dir / "metrics.json", "w") as f:
             json.dump(metrics, f, indent=2)
+        
+        print(f"Saved metrics to {output_dir / 'metrics.json'}")
+
+    def save_metrics_json_failed(self, sequence_id, dataset_name, output_dir: Path, start_time: float):
+        """Save metrics.json for failed runs."""
+        metrics = {
+            "sequence_id": sequence_id,
+            "dataset": dataset_name,
+            "system": self.cfg.system.name,
+            "config": asdict(self.cfg),
+            "timestamp": datetime.now().isoformat(),
+            "git_hash": get_git_hash(),
+            "status": "failed",
+            "error": "SLAM execution returned None",
+            "timing": {
+                "total_seconds": round(time.time() - start_time, 2),
+            },
+        }
+        
+        with open(output_dir / "metrics.json", "w") as f:
+            json.dump(metrics, f, indent=2)
+        
+        print(f"Saved failed metrics to {output_dir / 'metrics.json'}")
