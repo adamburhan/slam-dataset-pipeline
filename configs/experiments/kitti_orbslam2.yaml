@@ -10,7 +10,7 @@ system:
   runtime: "singularity"
   sif_path: "/home/adamb14/projects/adamb14/containers/orbslam2.sif" # Crucial for reproducibility
   docker_image: "orbslam2:latest" # Ignored if using singularity
-  display: true
+  display: false
   mount_slam: false
   # Optional: runtime specific args
   runtime_args:
