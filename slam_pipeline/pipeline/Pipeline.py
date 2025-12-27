@@ -13,6 +13,13 @@ from slam_pipeline.trajectories.alignment import align, align_valid_only
 from slam_pipeline.metrics.rpe import compute_rpe
 from slam_pipeline.trajectories.trajectory import TrajFormat, fill_and_correct_trajectory
 
+class JSONEncoder(json.JSONEncoder):
+    """Custom encoder to handle Path and other non-serializable types."""
+    def default(self, obj):
+        if isinstance(obj, Path):
+            return str(obj)
+        return super().default(obj)
+
 
 def get_git_hash():
     """Get current git commit hash, or 'unknown' if not in a git repo."""
@@ -255,7 +262,7 @@ class Pipeline:
         }
         
         with open(output_dir / "metrics.json", "w") as f:
-            json.dump(metrics, f, indent=2)
+            json.dump(metrics, f, indent=2, cls=JSONEncoder)
         
         print(f"Saved metrics to {output_dir / 'metrics.json'}")
 
@@ -276,6 +283,6 @@ class Pipeline:
         }
         
         with open(output_dir / "metrics.json", "w") as f:
-            json.dump(metrics, f, indent=2)
+            json.dump(metrics, f, indent=2, cls=JSONEncoder)
         
         print(f"Saved failed metrics to {output_dir / 'metrics.json'}")
