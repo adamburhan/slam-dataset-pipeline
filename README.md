@@ -1,3 +1,4 @@
+# TODO: update after aggregation is complete
 # SLAM Dataset Generation Pipeline
 
 This repository provides a reproducible pipeline to generate machine learning datasets from SLAM systems.
