@@ -13,6 +13,8 @@ module load apptainer
 
 REPO_DIR="/home/adamb14/repos/slam-dataset-pipeline"
 
+source "${REPO_DIR}/.venv/bin/activate"
+
 SEQUENCE_LIST="${REPO_DIR}/lists/kitti.txt"
 DATASET_ROOT="/scratch/adamb14/ood_slam/datasets/kitti/raw"
 CONFIG_FILE="${REPO_DIR}/configs/experiments/kitti_orbslam2.yaml"
@@ -37,10 +39,10 @@ cp -r "${DATASET_ROOT}/poses" "$SLURM_TMPDIR/"
 echo "Staged to $SLURM_TMPDIR:"
 ls -la "$SLURM_TMPDIR"
 
-srun python3 scripts/run_sequence_cli.py \
-    --config "$CONFIG_FILE" \
-    --sequence_id "$sequence_id" \
-    --dataset_root "$SLURM_TMPDIR" \
-    --output_dir "results"
+# srun python scripts/run_sequence_cli.py \
+#     --config "$CONFIG_FILE" \
+#     --sequence_id "$sequence_id" \
+#     --dataset_root "$SLURM_TMPDIR" \
+#     --output_dir "results"
 
-echo "End: $(date)"
+# echo "End: $(date)"
