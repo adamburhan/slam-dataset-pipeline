@@ -8,7 +8,7 @@ dataset:
 system:
   name: "orbslam2"
   runtime: "singularity"
-  sif_path: "orbslam2.sif" # Crucial for reproducibility
+  sif_path: "/home/adamb14/projects/adamb14/containers/orbslam2.sif" # Crucial for reproducibility
   docker_image: "orbslam2:latest" # Ignored if using singularity
   display: true
   mount_slam: false
