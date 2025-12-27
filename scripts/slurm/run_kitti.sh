@@ -49,7 +49,7 @@ srun python scripts/run_sequence_cli.py \
 
 # Copy results back to persistent storage
 OUTPUT_ROOT="/scratch/adamb14/ood_slam/results/kitti/orbslam2"
-mkdir -p "${OUTPUT_ROOT}/${sequence_id}"
-cp -r "$SLURM_TMPDIR/results/"* "${OUTPUT_ROOT}/${sequence_id}/"
+mkdir -p "${OUTPUT_ROOT}"
+cp -r "$SLURM_TMPDIR/results/"* "${OUTPUT_ROOT}/"
 
 echo "End: $(date)"
