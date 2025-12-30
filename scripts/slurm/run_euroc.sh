@@ -45,7 +45,7 @@ srun python scripts/run_sequence_cli.py \
     --output_dir "$SLURM_TMPDIR/results"
 
 # Copy results back to persistent storage
-OUTPUT_ROOT="/scratch/adamb14/ood_slam/results/kitti/orbslam2"
+OUTPUT_ROOT="/scratch/adamb14/ood_slam/results/euroc/orbslam2"
 mkdir -p "${OUTPUT_ROOT}"
 cp -r "$SLURM_TMPDIR/results/"* "${OUTPUT_ROOT}/"
 
