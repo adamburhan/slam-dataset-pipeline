@@ -18,3 +18,8 @@ class Dataset(ABC):
     def load_ground_truth(self, sequence: Sequence) -> Optional[np.ndarray]:
         """Load ground truth for a sequence in this dataset's format"""
         pass
+
+    @abstractmethod
+    def load_frame_stamps(self, sequence: Sequence) -> np.ndarray:
+        """Load and cache frame timestamps. Returns stamps in seconds."""
+        pass

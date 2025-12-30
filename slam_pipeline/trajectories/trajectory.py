@@ -5,7 +5,8 @@ from pathlib import Path
 from slam_pipeline.utils.transformations import pos_quats2SE_matrices
 from slam_pipeline.trajectories.tracking_states import is_track_valid
 from enum import Enum
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Slerp, Rotation
+from scipy.interpolate import interp1d
 import slam_pipeline.utils.lie_algebra as lie
 
 class TrajFormat(Enum):
@@ -285,4 +286,63 @@ def transform(
         poses=transformed_poses,
         frame_ids=traj.frame_ids,
         tracking_states=traj.tracking_states
+    )
+
+
+def interpolate_trajectory(
+    traj: Trajectory,
+    target_stamps: np.ndarray,
+    target_frame_ids: np.ndarray = None
+) -> Trajectory:
+    """
+    Interpolate trajectory to target timestamps.
+    
+    Uses linear interpolation for translation and SLERP for rotation.
+    
+    Args:
+        traj: Source trajectory (high-frequency, e.g., GT at 200Hz)
+        target_stamps: Timestamps to interpolate to (e.g., image timestamps)
+        target_frame_ids: Frame IDs for output trajectory (default: 0, 1, 2, ...)
+    
+    Returns:
+        Interpolated trajectory at target_stamps
+    """
+    src_stamps = traj.stamps
+    src_poses = traj.poses  # (N, 4, 4)
+    
+    # Check bounds - target stamps must be within source range
+    if target_stamps.min() < src_stamps.min() or target_stamps.max() > src_stamps.max():
+        raise ValueError(
+            f"Target stamps [{target_stamps.min()}, {target_stamps.max()}] "
+            f"outside source range [{src_stamps.min()}, {src_stamps.max()}]"
+        )
+    
+    # Extract translations (N, 3)
+    translations = src_poses[:, :3, 3]
+    
+    # Extract rotations (N, 3, 3) -> Rotation objects
+    rotations = Rotation.from_matrix(src_poses[:, :3, :3])
+    
+    # Interpolate translations with linear interp
+    trans_interp = interp1d(src_stamps, translations, axis=0, kind='linear')
+    interp_translations = trans_interp(target_stamps)  # (M, 3)
+    
+    # Interpolate rotations with SLERP
+    slerp = Slerp(src_stamps, rotations)
+    interp_rotations = slerp(target_stamps)  # Rotation object with M rotations
+    
+    # Build output poses (M, 4, 4)
+    M = len(target_stamps)
+    interp_poses = np.zeros((M, 4, 4), dtype=np.float64)
+    interp_poses[:, :3, :3] = interp_rotations.as_matrix()
+    interp_poses[:, :3, 3] = interp_translations
+    interp_poses[:, 3, 3] = 1.0
+    
+    if target_frame_ids is None:
+        target_frame_ids = np.arange(M, dtype=np.int32)
+    
+    return Trajectory(
+        stamps=target_stamps.copy(),
+        poses=interp_poses,
+        frame_ids=target_frame_ids,
     )

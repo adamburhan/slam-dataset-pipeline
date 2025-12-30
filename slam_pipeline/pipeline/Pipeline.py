@@ -70,6 +70,7 @@ class Pipeline:
         # 1. Setup
         dataset = get_dataset(self.cfg.dataset)
         sequence = dataset.get_sequence(sequence_id)
+        dataset.load_frame_stamps(sequence)
         N = sequence.num_frames()
         
         slam_system = get_system(self.cfg.system)

@@ -70,3 +70,10 @@ class KittiDataset(Dataset):
             poses=poses,
             frame_ids=frame_ids,
         )
+        
+    def load_frame_stamps(self, sequence: Sequence) -> np.ndarray:
+        if sequence._frame_stamps is None:
+            stamps = np.loadtxt(sequence.timestamps_file, dtype=np.float64)
+            sequence._frame_stamps = np.atleast_1d(stamps)
+            sequence._num_frames = len(sequence._frame_stamps)
+        return sequence._frame_stamps
