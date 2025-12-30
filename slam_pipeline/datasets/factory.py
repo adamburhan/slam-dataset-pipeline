@@ -3,6 +3,7 @@ from typing import Dict, Any
 from .Dataset import Dataset
 from slam_pipeline.datasets.KittiDataset import KittiDataset
 from slam_pipeline.datasets.TartanAirDataset import TartanAirDataset
+from slam_pipeline.datasets.EurocDataset import EurocDataset
 # from .TartanAirDataset import TartanAirDataset # Example
 
 def get_dataset(config: Any) -> Dataset:
@@ -28,5 +29,7 @@ def get_dataset(config: Any) -> Dataset:
         domains = getattr(config, 'domains', config.get('domains') if isinstance(config, dict) else None)
         difficulties = getattr(config, 'difficulties', config.get('difficulties') if isinstance(config, dict) else None)
         return TartanAirDataset(root_path, domains=domains, difficulties=difficulties)
+    elif name == "euroc":
+        return EurocDataset(root_path)
     else:
         raise ValueError(f"Unknown dataset: {name}")

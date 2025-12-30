@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
-#SBATCH --array=0-9
+#SBATCH --array=0-10
 #SBATCH --output=logs/%x_%A_%a.out
 
 set -e
@@ -27,10 +27,9 @@ echo "Start: $(date)"
 
 # Stage data to local SSD
 echo "Staging data..."
-mkdir -p "$SLURM_TMPDIR/sequences"
 
 # Copy and extract sequence
-cp "${DATASET_ROOT}/sequences/${sequence_id}.zip" "$SLURM_TMPDIR/"
+cp "${DATASET_ROOT}/${sequence_id}.zip" "$SLURM_TMPDIR/"
 unzip "$SLURM_TMPDIR/${sequence_id}.zip" -d "$SLURM_TMPDIR"/${sequence_id}
 
 echo "Staged to $SLURM_TMPDIR:"
