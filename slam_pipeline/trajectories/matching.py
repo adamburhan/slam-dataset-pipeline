@@ -108,6 +108,26 @@ def prepare_matched_pair(
     gt_traj = dataset.load_ground_truth(sequence)
     est_traj = load_estimated_trajectory(est_path, est_format)
     
+    # Convert nanoseconds to seconds if needed
+    if gt_traj.stamps[0] > 1e12:
+        print(f"  Converting GT from ns to s")
+        gt_traj.stamps = gt_traj.stamps / 1e9
+    if est_traj.stamps[0] > 1e12:
+        print(f"  Converting EST from ns to s")
+        est_traj.stamps = est_traj.stamps / 1e9
+    
+    # Clip EST to GT time range
+    gt_min, gt_max = gt_traj.stamps.min(), gt_traj.stamps.max()
+    valid_est_mask = (est_traj.stamps >= gt_min) & (est_traj.stamps <= gt_max)
+    if valid_est_mask.sum() < len(est_traj.stamps):
+        print(f"Clipping {len(est_traj.stamps) - valid_est_mask.sum()} EST poses outside GT range")
+        est_traj = Trajectory(
+            stamps=est_traj.stamps[valid_est_mask],
+            poses=est_traj.poses[valid_est_mask],
+            frame_ids=est_traj.frame_ids[valid_est_mask] if est_traj.frame_ids is not None else None,
+            tracking_states=est_traj.tracking_states[valid_est_mask] if est_traj.tracking_states is not None else None,
+        )
+        
     # Fill and correct BEFORE association
     if fill_policy == "constant_velocity":
         est_traj = fill_and_correct_trajectory(est_traj)

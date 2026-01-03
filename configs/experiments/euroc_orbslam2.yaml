@@ -22,7 +22,7 @@ pipeline:
   loading:
     est_format: "tracking_csv_v1" # or kitti, euroc
     association:
-      max_diff: 0.001
+      max_diff: 0.03
       require_unique: true
       assign_gt_frame_ids_to_est: true
       strict: true

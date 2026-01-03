@@ -29,8 +29,11 @@ echo "Start: $(date)"
 echo "Staging data..."
 
 # Copy and extract sequence
-cp "${DATASET_ROOT}/${sequence_id}.zip" "$SLURM_TMPDIR/"
+cp "${DATASET_ROOT}/${sequence_id}/${sequence_id}.zip" "$SLURM_TMPDIR/"
 unzip "$SLURM_TMPDIR/${sequence_id}.zip" -d "$SLURM_TMPDIR"/${sequence_id}
+
+mkdir -p "$SLURM_TMPDIR/timestamps"
+cp "${DATASET_ROOT}/timestamps/${sequence_id}.txt" "$SLURM_TMPDIR/timestamps/"
 
 echo "Staged to $SLURM_TMPDIR:"
 ls -la "$SLURM_TMPDIR"
