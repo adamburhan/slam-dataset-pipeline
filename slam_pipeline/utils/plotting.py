@@ -12,13 +12,13 @@ def plot_trajectory(est_poses, gt_poses, save_path: Path):
     # Top-down view is X vs Z
     
     if gt_poses is not None:
-        ax.plot(gt_poses[:, 0, 3], gt_poses[:, 1, 3], 'k--', linewidth=1.5, label="Ground Truth", alpha=0.6)
+        ax.plot(gt_poses[:, 0, 3], gt_poses[:, 2, 3], 'k--', linewidth=1.5, label="Ground Truth", alpha=0.6)
         
-    ax.plot(est_poses[:, 0, 3], est_poses[:, 1, 3], 'b-', linewidth=1.5, label="Estimated", alpha=0.8)
+    ax.plot(est_poses[:, 0, 3], est_poses[:, 2, 3], 'b-', linewidth=1.5, label="Estimated", alpha=0.8)
     
     # Mark start/end
-    ax.plot(est_poses[0, 0, 3], est_poses[0, 1, 3], 'go', markersize=8, label='Start')
-    ax.plot(est_poses[-1, 0, 3], est_poses[-1, 1, 3], 'rs', markersize=8, label='End')
+    ax.plot(est_poses[0, 0, 3], est_poses[0, 2, 3], 'go', markersize=8, label='Start')
+    ax.plot(est_poses[-1, 0, 3], est_poses[-1, 2, 3], 'rs', markersize=8, label='End')
     
     ax.axis('equal')
     ax.set_xlabel('X (meters)')

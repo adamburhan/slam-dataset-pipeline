@@ -12,9 +12,6 @@ def associate_nearest_timestamp(
     est_t = np.asarray(est.stamps, dtype=np.float64)
     gt_t  = np.asarray(gt.stamps, dtype=np.float64)
 
-    print(f"GT stamps[0] raw: {gt.stamps[0]:.6f}")
-    print(f"EST stamps[0] raw: {est.stamps[0]:.6f}")
-
     if est_t.ndim != 1 or gt_t.ndim != 1:
         raise ValueError("Both est.stamps and gt.stamps must be 1D arrays.")
     if len(est_t) == 0 or len(gt_t) == 0:

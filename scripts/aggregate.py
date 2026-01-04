@@ -55,28 +55,34 @@ def main():
     all_rpe_trans_exists = []
     all_rpe_rot_exists = []
 
-    for seq_folder in results_dir.iterdir():
-        if not seq_folder.is_dir():
-            continue
+    print(f"Searching for metrics.json in {results_dir}...")
+    metric_files = list(results_dir.rglob("metrics.json"))
+    print(f"Found {len(metric_files)} sequences.")
 
-        metrics_path = seq_folder / "metrics.json"
-        csv_path = seq_folder / "labels.csv"
-        
-        # Skip folders that don't have expected files
-        if not metrics_path.exists() or not csv_path.exists():
-            continue
+    for result_file in metric_files:
+        # The parent folder is the sequence folder (e.g., .../P001 or .../00)
+        seq_folder = result_file.parent 
 
-        result_file = seq_folder / "metrics.json"
+        # 1. Load Metrics
         try:
             with open(result_file, 'r') as f:
                 data = json.load(f)
                 aggregate_data.append(data)
-        except FileNotFoundError:
-            print(f"Warning: No metrics.json found in {seq_folder}")
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON in {result_file}: {e}")
+        except Exception as e:
+            print(f"Error reading {result_file}: {e}")
+            continue
+        
+        # 2. Check for failure status before looking for CSV
+        if data.get('status') == 'failed':
+            # Failed runs won't have labels.csv, skip CSV processing
+            continue
 
+        # 3. Load CSV Labels
         csv_path = seq_folder / "labels.csv"
+        if not csv_path.exists():
+            print(f"Warning: labels.csv missing for successful run {seq_folder}")
+            continue
+
         try:
             df = pd.read_csv(csv_path)
             valid = df[df['valid'] == 1]
@@ -88,15 +94,26 @@ def main():
         except Exception as e:
             print(f"Error processing {csv_path}: {e}")
 
-    stats_valid = {
-        'trans': compute_stats(all_rpe_trans_valid),
-        'rot': compute_stats(all_rpe_rot_valid)
-    }
+    # Check if we found data
+    if not aggregate_data:
+        print("No data found. Exiting.")
+        return
 
-    stats_exists = {
-        'trans': compute_stats(all_rpe_trans_exists),
-        'rot': compute_stats(all_rpe_rot_exists)
-    }
+    # Handle empty lists before computing stats (in case all runs failed)
+    if len(all_rpe_trans_valid) == 0:
+        print("No valid RPE data found (all runs failed or no valid frames).")
+        stats_valid = {'trans': {}, 'rot': {}} # Or appropriate empty placeholder
+        stats_exists = {'trans': {}, 'rot': {}}
+    else:
+        stats_valid = {
+            'trans': compute_stats(all_rpe_trans_valid),
+            'rot': compute_stats(all_rpe_rot_valid)
+        }
+
+        stats_exists = {
+            'trans': compute_stats(all_rpe_trans_exists),
+            'rot': compute_stats(all_rpe_rot_exists)
+        }
 
     # Build summary
     summary = {
@@ -116,61 +133,78 @@ def main():
     # Build comparison table
     rows = []
     for data in aggregate_data:
-        rows.append({
-            'sequence_id': data['sequence_id'],
-            'rpe_trans_rmse': data['rpe_valid']['trans']['rmse'],
-            'rpe_trans_mean': data['rpe_valid']['trans']['mean'],
-            'rpe_rot_rmse': data['rpe_valid']['rot']['rmse'],
-            'rpe_rot_mean': data['rpe_valid']['rot']['mean'],
-            'tracking_rate': data['tracking']['tracking_rate'],
-            'filled_frames': data['tracking']['filled_frames'],
-            'scale_factor': data['scale_factor'],
-            'total_frames': data['tracking']['total_frames'],
-            'status': data['status'],
-        })
+        # Handle failed runs in table
+        if data.get('status') == 'failed':
+             rows.append({
+                'sequence_id': data['sequence_id'],
+                'status': 'failed',
+                'error': data.get('error', 'unknown'),
+                'rpe_trans_rmse': None, # Fill Nones for alignment
+                'rpe_trans_mean': None,
+                'rpe_rot_rmse': None,
+                'rpe_rot_mean': None,
+                'tracking_rate': None,
+                'filled_frames': None,
+                'scale_factor': None,
+                'total_frames': None,
+            })
+        else:
+            rows.append({
+                'sequence_id': data['sequence_id'],
+                'status': data['status'],
+                'rpe_trans_rmse': data['rpe_valid']['trans']['rmse'],
+                'rpe_trans_mean': data['rpe_valid']['trans']['mean'],
+                'rpe_rot_rmse': data['rpe_valid']['rot']['rmse'],
+                'rpe_rot_mean': data['rpe_valid']['rot']['mean'],
+                'tracking_rate': data['tracking']['tracking_rate'],
+                'filled_frames': data['tracking']['filled_frames'],
+                'scale_factor': data['scale_factor'],
+                'total_frames': data['tracking']['total_frames'],
+            })
 
     df_comparison = pd.DataFrame(rows)
     df_comparison.to_csv(results_dir / "comparison_table.csv", index=False)
     print(f"Saved comparison table to {results_dir / 'comparison_table.csv'}")
 
-    # Plot histograms
-    (results_dir / "plots").mkdir(exist_ok=True)
-    for scale in ['log', 'linear']:
-        plot_histogram(
-            all_rpe_trans_valid,
-            title="RPE Translation (Valid Frames)",
-            xlabel="RPE Translation (m)",
-            ylabel="Frequency",
-            output_path=results_dir / "plots" / f"rpe_trans_valid_{scale}.png",
-            log_scale=(scale == 'log')
-        )
+    # Plot histograms (Only if we have data)
+    if len(all_rpe_trans_valid) > 0:
+        (results_dir / "plots").mkdir(exist_ok=True)
+        for scale in ['log', 'linear']:
+            plot_histogram(
+                all_rpe_trans_valid,
+                title="RPE Translation (Valid Frames)",
+                xlabel="RPE Translation (m)",
+                ylabel="Frequency",
+                output_path=results_dir / "plots" / f"rpe_trans_valid_{scale}.png",
+                log_scale=(scale == 'log')
+            )
 
-        plot_histogram(
-            all_rpe_rot_valid,
-            title="RPE Rotation (Valid Frames)",
-            xlabel="RPE Rotation (deg)",
-            ylabel="Frequency",
-            output_path=results_dir / "plots" / f"rpe_rot_valid_{scale}.png",
-            log_scale=(scale == 'log')
-        )
+            plot_histogram(
+                all_rpe_rot_valid,
+                title="RPE Rotation (Valid Frames)",
+                xlabel="RPE Rotation (deg)",
+                ylabel="Frequency",
+                output_path=results_dir / "plots" / f"rpe_rot_valid_{scale}.png",
+                log_scale=(scale == 'log')
+            )
 
-        plot_histogram(
-            all_rpe_trans_exists,
-            title="RPE Translation (Valid & filled Frames)",
-            xlabel="RPE Translation (m)",
-            ylabel="Frequency",
-            output_path=results_dir / "plots" / f"rpe_trans_exists_{scale}.png",
-            log_scale=(scale == 'log')
-        )
+            plot_histogram(
+                all_rpe_trans_exists,
+                title="RPE Translation (Valid & filled Frames)",
+                xlabel="RPE Translation (m)",
+                ylabel="Frequency",
+                output_path=results_dir / "plots" / f"rpe_trans_exists_{scale}.png",
+                log_scale=(scale == 'log')
+            )
 
-        plot_histogram(
-            all_rpe_rot_exists,
-            title="RPE Rotation (Valid & filled Frames)",
-            xlabel="RPE Rotation (deg)",
-            ylabel="Frequency",
-            output_path=results_dir / "plots" / f"rpe_rot_exists_{scale}.png",
-            log_scale=(scale == 'log')
-        )
+            plot_histogram(
+                all_rpe_rot_exists,
+                title="RPE Rotation (Valid & filled Frames)",
+                xlabel="RPE Rotation (deg)",
+                ylabel="Frequency",
+                output_path=results_dir / "plots" / f"rpe_rot_exists_{scale}.png",
+                log_scale=(scale == 'log')
+            )
 
 if __name__ == "__main__":
     main()

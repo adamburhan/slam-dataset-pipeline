@@ -105,8 +105,14 @@ def prepare_matched_pair(
     fill_policy: str = "none" # none or "constant_velocity"
 ) -> MatchedPair:
     sequence = dataset.get_sequence(seq_id)
+
+    dataset.load_frame_stamps(sequence)
+
     gt_traj = dataset.load_ground_truth(sequence)
     est_traj = load_estimated_trajectory(est_path, est_format)
+
+    if len(est_traj) == 0:
+        raise ValueError(f"Estimated trajectory is empty. SLAM likely failed to initialize.")
     
     # Convert nanoseconds to seconds if needed
     if gt_traj.stamps[0] > 1e12:

@@ -144,3 +144,16 @@ class TartanAirDataset(Dataset):
     def list_by_difficulty(self, difficulty: str) -> list[str]:
         """List sequences for a specific difficulty."""
         return [f"{d}/{diff}/{s}" for d, diff, s in self._discover_sequences() if diff == difficulty]
+
+    def load_frame_stamps(self, sequence: TartanAirSequence) -> np.ndarray:
+        """Load frame timestamps from times.txt."""
+        if sequence._frame_stamps is None:
+            if not sequence.timestamps_file.exists():
+                raise FileNotFoundError(f"Timestamps file not found: {sequence.timestamps_file}")
+            
+            # Load timestamps (seconds)
+            stamps = np.loadtxt(sequence.timestamps_file, dtype=np.float64)
+            sequence._frame_stamps = np.atleast_1d(stamps)
+            sequence._num_frames = len(sequence._frame_stamps)
+            
+        return sequence._frame_stamps
