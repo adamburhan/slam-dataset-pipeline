@@ -39,6 +39,12 @@ case "$DATASET" in
     CONFIG_FILE="Examples/Monocular/tartanAir.yaml"
     SEQ_PATH="/datasets/tartanair/$SEQUENCE"
     ;;
+  "ETH3D")
+    EXECUTABLE="./Examples/Monocular/mono_eth3d"
+    VOCAB_FILE="Vocabulary/ORBvoc.txt"
+    CONFIG_FILE="Examples/Monocular/ETH3D.yaml" 
+    SEQ_PATH="/datasets/eth3d/$SEQUENCE"
+    ;;
   *)
     echo "Unsupported dataset: $DATASET" >&2
     exit 1
@@ -61,6 +67,17 @@ if [[ "$DATASET" == "KITTI" ]]; then
       exit 1
       ;;
   esac
+fi
+
+if [[ "$DATASET" == "ETH3D" ]]; then
+  # Check if sequence starts with "sfm_"
+  if [[ "$SEQUENCE" == sfm_* ]]; then
+      echo "Detected SFM sequence: using ETH3D_SFM.yaml"
+      CONFIG_FILE="Examples/Monocular/ETH3D_SFM.yaml"
+  else
+      # Default for cables, plant, sofa, manequin, etc.
+      CONFIG_FILE="Examples/Monocular/ETH3D.yaml"
+  fi
 fi
 
 mkdir -p "$OUTPUT_PATH"
