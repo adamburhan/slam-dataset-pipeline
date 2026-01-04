@@ -4,6 +4,7 @@ from .Dataset import Dataset
 from slam_pipeline.datasets.KittiDataset import KittiDataset
 from slam_pipeline.datasets.TartanAirDataset import TartanAirDataset
 from slam_pipeline.datasets.EurocDataset import EurocDataset
+from slam_pipeline.datasets.Eth3dDataset import Eth3dDataset
 # from .TartanAirDataset import TartanAirDataset # Example
 
 def get_dataset(config: Any) -> Dataset:
@@ -31,5 +32,7 @@ def get_dataset(config: Any) -> Dataset:
         return TartanAirDataset(root_path, domains=domains, difficulties=difficulties)
     elif name == "euroc":
         return EurocDataset(root_path)
+    elif name == "eth3d":
+        return Eth3dDataset(root_path)
     else:
         raise ValueError(f"Unknown dataset: {name}")

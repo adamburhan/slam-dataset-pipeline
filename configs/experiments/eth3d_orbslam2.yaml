@@ -1,0 +1,50 @@
+# 1. Dataset Configuration
+dataset:
+  name: "eth3d"  # kitti, tum, euroc
+  root_dir: "/media/adam/T97/ood_slam_data/datasets/eth3d/"
+  sequences: ["cables_2"] # Optional: can be overridden by CLI for Slurm
+
+# 2. System / Runtime Configuration
+system:
+  name: "orbslam2"
+  runtime: "singularity"
+  #sif_path: "/home/adamb14/projects/def-lpaull/adamb14/ood_slam/containers/orbslam2.sif" # Crucial for reproducibility
+  sif_path: "/home/adam/Documents/MILA/projects/slam-dataset-pipeline/orbslam2.sif" 
+  docker_image: "orbslam2:latest" # Ignored if using singularity
+  display: true
+  mount_slam: false
+  # Optional: runtime specific args
+  runtime_args:
+    network: "host"
+
+# 3. Processing Pipeline Configuration
+pipeline:
+  # A. Trajectory Loading & Matching
+  loading:
+    est_format: "tracking_csv_v1" # or kitti, euroc
+    association:
+      max_diff: 0.03
+      require_unique: true
+      assign_gt_frame_ids_to_est: true
+      strict: true
+      interpolate_gt: false
+    fill_policy: "constant_velocity" # mask, impute_last, constant_velocity
+
+  # B. Alignment (Sim3 vs SE3)
+  alignment:
+    method: "sim3" # sim3 (with scale), se3 (rigid), or none
+    only_scale: false # whether to only apply scale without rotation/translation
+    align_ground_truth: false # usually we align est to gt
+
+  # C. Metrics to Compute
+  metrics:
+    - name: "rpe"
+      params: { unit: "meters" }
+    - name: "ate"
+    
+  # D. Output / Artifacts
+  output:
+    save_trajectory: true
+    save_plots: true
+    save_labels: true # The ML dataset format
+    output_dir: "/media/adam/T97/ood_slam_data/datasets/eth3d/output_test_docker_results"
